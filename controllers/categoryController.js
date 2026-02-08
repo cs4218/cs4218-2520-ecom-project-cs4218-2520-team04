@@ -6,7 +6,7 @@ export const createCategoryController = async (req, res) => {
   try {
     const { name } = req.body;
     if (!name || !name.trim()) {
-      return res.status(400).send({ message: "Name is required" });
+      return res.status(400).send({ success: false, message: "Name is required" });
     }
     const trimmedName = name.trim();
     const existingCategory = await categoryModel.findOne({ name: trimmedName });
@@ -42,7 +42,7 @@ export const updateCategoryController = async (req, res) => {
     const { id } = req.params;
 
     if (!name || !name.trim()) {
-      return res.status(400).send({ message: "Name is required" });
+      return res.status(400).send({ success: false, message: "Name is required" });
     }
 
     const trimmedName = name.trim();
