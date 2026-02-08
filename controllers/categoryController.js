@@ -1,21 +1,24 @@
 import categoryModel from "../models/categoryModel.js";
+import productModel from "../models/productModel.js";
 import slugify from "slugify";
+
 export const createCategoryController = async (req, res) => {
   try {
     const { name } = req.body;
-    if (!name) {
+    if (!name || !name.trim()) {
       return res.status(400).send({ message: "Name is required" });
     }
-    const existingCategory = await categoryModel.findOne({ name });
+    const trimmedName = name.trim();
+    const existingCategory = await categoryModel.findOne({ name: trimmedName });
     if (existingCategory) {
-      return res.status(200).send({
-        success: true,
-        message: "Category Already Exisits",
+      return res.status(409).send({
+        success: false,
+        message: "Category Already Exists",
       });
     }
     const category = await new categoryModel({
-      name,
-      slug: slugify(name),
+      name: trimmedName,
+      slug: slugify(trimmedName),
     }).save();
     res.status(201).send({
       success: true,
@@ -32,16 +35,30 @@ export const createCategoryController = async (req, res) => {
   }
 };
 
-//update category
-  export const updateCategoryController = async (req, res) => {
+// update category
+export const updateCategoryController = async (req, res) => {
   try {
     const { name } = req.body;
     const { id } = req.params;
+
+    if (!name || !name.trim()) {
+      return res.status(400).send({ message: "Name is required" });
+    }
+
+    const trimmedName = name.trim();
     const category = await categoryModel.findByIdAndUpdate(
       id,
-      { name, slug: slugify(name) },
+      { name: trimmedName, slug: slugify(trimmedName) },
       { new: true }
     );
+
+    if (!category) {
+      return res.status(404).send({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
     res.status(200).send({
       success: true,
       message: "Category Updated Successfully",
@@ -95,11 +112,28 @@ export const singleCategoryController = async (req, res) => {
   }
 };
 
-//delete category
+// delete category
 export const deleteCategoryController = async (req, res) => {
   try {
     const { id } = req.params;
-    await categoryModel.findByIdAndDelete(id);
+
+    // Check if any products belong to this category
+    const products = await productModel.find({ category: id });
+    if (products.length > 0) {
+      return res.status(400).send({
+        success: false,
+        message: "Cannot delete category with associated products",
+      });
+    }
+
+    const category = await categoryModel.findByIdAndDelete(id);
+    if (!category) {
+      return res.status(404).send({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
     res.status(200).send({
       success: true,
       message: "Category Deleted Successfully",
