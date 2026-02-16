@@ -21,12 +21,8 @@ export default {
 
   // only run these tests
   testMatch: [
-      "<rootDir>/client/src/pages/Auth/*.test.js",
-      "<rootDir>/client/src/context/auth.test.js",
-      "<rootDir>/client/src/components/AdminMenu.test.js",
-      "<rootDir>/client/src/pages/admin/AdminDashboard.test.js",
-      "<rootDir>/client/src/pages/user/Profile.test.js",
-      "<rootDir>/client/src/pages/admin/Users.test.js"
+      "<rootDir>/client/src/**/*.test.js",
+      "<rootDir>/client/src/pages/*.test.js"
   ],
 
   // jest code coverage
@@ -36,7 +32,8 @@ export default {
       "client/src/pages/user/**",
       "client/src/context/**",
       "client/src/components/**",
-      "client/src/pages/admin/**"
+      "client/src/pages/admin/**",
+      "client/src/pages/**",
   ],
   coverageThreshold: {
     global: {
