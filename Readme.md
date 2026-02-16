@@ -1,4 +1,7 @@
 # CS4218 Project - Virtual Vault
+[![Node.js CI](https://github.com/mervyn-teo/cs4218-2520-ecom-project-cs4218-2520-team04/actions/workflows/node.js.yml/badge.svg)](https://github.com/mervyn-teo/cs4218-2520-ecom-project-cs4218-2520-team04/actions/workflows/node.js.yml)
+
+[🎉Click me for MS1 CI URL🎉](https://github.com/mervyn-teo/cs4218-2520-ecom-project-cs4218-2520-team04/actions/runs/21817729423/job/62943059474)
 
 ## 1. Project Introduction
 
