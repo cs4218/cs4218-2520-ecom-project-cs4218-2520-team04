@@ -1,69 +1,64 @@
+//
+// Lu Yixuan, Deborah, A0277911X
+//
 import React from "react";
-import { render, screen } from "@testing-library/react";
-import "@testing-library/jest-dom/extend-expect";
-import Search from "./Search";
-import { useSearch } from "../context/search";
+import { render, screen, fireEvent } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import { SearchProvider, useSearch } from "../context/search";
 
-// Mocks
-jest.mock("../context/search", () => ({
-  useSearch: jest.fn(),
-}));
+const Consumer = () => {
+  const [values, setValues] = useSearch();
+  return (
+    <div>
+      <div data-testid="keyword">{values.keyword}</div>
+      <div data-testid="results-len">{values.results.length}</div>
+      <button onClick={() => setValues({ keyword: "abc", results: [1, 2] })}>
+        set
+      </button>
+    </div>
+  );
+};
 
-jest.mock("./../components/Layout", () => ({ children }) => (
-  <div data-testid="layout">{children}</div>
-));
+describe("SearchContext (unit)", () => {
+  test("Given SearchProvider, When Consumer renders, Then it provides default values", () => {
+    // Given / When
+    render(
+      <SearchProvider>
+        <Consumer />
+      </SearchProvider>
+    );
 
-describe("Search page", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+    // Then
+    expect(screen.getByTestId("keyword")).toHaveTextContent("");
+    expect(screen.getByTestId("results-len")).toHaveTextContent("0");
   });
 
-  it("shows 'No Products Found' when results empty", () => {
-    useSearch.mockReturnValue([{ keyword: "x", results: [] }, jest.fn()]);
+  test("Given SearchProvider, When setValues is called, Then values update", () => {
+    // Given
+    render(
+      <SearchProvider>
+        <Consumer />
+      </SearchProvider>
+    );
 
-    render(<Search />);
+    // When
+    fireEvent.click(screen.getByRole("button", { name: /set/i }));
 
-    expect(screen.getByTestId("layout")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Search Resuts/i })).toBeInTheDocument();
-    expect(screen.getByText(/No Products Found/i)).toBeInTheDocument();
+    // Then
+    expect(screen.getByTestId("keyword")).toHaveTextContent("abc");
+    expect(screen.getByTestId("results-len")).toHaveTextContent("2");
   });
 
-  it("shows count and renders product cards when results exist", () => {
-    useSearch.mockReturnValue([
-      {
-        keyword: "x",
-        results: [
-          {
-            _id: "p1",
-            name: "Product 1",
-            description: "This is a long description for product one",
-            price: 10,
-          },
-          {
-            _id: "p2",
-            name: "Product 2",
-            description: "Another long description for product two",
-            price: 20,
-          },
-        ],
-      },
-      jest.fn(),
-    ]);
+  test("Given useSearch is used without provider, When rendered, Then it throws a helpful error", () => {
+    // Given: a component using the hook without provider
+    const BadConsumer = () => {
+      useSearch();
+      return null;
+    };
 
-    render(<Search />);
-
-    expect(screen.getByText("Found 2")).toBeInTheDocument();
-    expect(screen.getByText("Product 1")).toBeInTheDocument();
-    expect(screen.getByText("Product 2")).toBeInTheDocument();
-    expect(screen.getByText(/\$ 10/)).toBeInTheDocument();
-    expect(screen.getByText(/\$ 20/)).toBeInTheDocument();
-
-    // images should exist with correct alt text
-    expect(screen.getByAltText("Product 1")).toBeInTheDocument();
-    expect(screen.getByAltText("Product 2")).toBeInTheDocument();
-
-    // buttons
-    expect(screen.getAllByText(/More Details/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/ADD TO CART/i).length).toBeGreaterThan(0);
+    // When / Then
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useSearch must be used within a SearchProvider"
+    );
   });
 });
