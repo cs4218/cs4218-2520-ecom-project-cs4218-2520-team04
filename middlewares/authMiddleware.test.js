@@ -1,3 +1,4 @@
+// Mervyn Teo Zi Yan, A0273039A
 import { requireSignIn, isAdmin } from "./authMiddleware";
 import JWT from "jsonwebtoken";
 import userModel from "../models/userModel.js";
@@ -5,6 +6,7 @@ import userModel from "../models/userModel.js";
 jest.mock("jsonwebtoken");
 jest.mock("../models/userModel.js");
 
+// Written with the aid of Gemini AI
 describe("Auth Middleware Tests", () => {
     let req, res, next;
 
@@ -36,6 +38,11 @@ describe("Auth Middleware Tests", () => {
             // Verify it logged the error without showing it in the terminal
             expect(console.log).toHaveBeenCalled();
             expect(next).not.toHaveBeenCalled();
+            // Verify it sent the correct response
+            expect(res.status).toHaveBeenCalledWith(401);
+            expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
+                message: "Invalid or expired token"
+            }));
         });
     });
 

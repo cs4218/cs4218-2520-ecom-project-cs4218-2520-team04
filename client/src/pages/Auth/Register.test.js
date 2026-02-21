@@ -1,3 +1,4 @@
+// Mervyn Teo Zi Yan, A0273039A
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import axios from 'axios';
@@ -43,8 +44,8 @@ window.matchMedia = window.matchMedia || function() {
       removeListener: function() {}
     };
   };
-      
 
+// Written with the aid of Gemini AI
 describe('Register Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -155,5 +156,36 @@ describe('Register Component', () => {
       expect(registerBtn).not.toBeDisabled();
       expect(registerBtn).toHaveTextContent(/REGISTER/i);
     }, {timeout: 3000});
+  });
+
+  it('should display the specific backend error message on a 404 response', async () => {
+    // Simulate Axios throwing an error with a backend response payload
+    axios.post.mockRejectedValueOnce({
+      response: {
+        data: { success: false, message: "Email is not registerd" }
+      }
+    });
+
+    const { getByText, getByPlaceholderText } = render(
+        <MemoryRouter initialEntries={['/register']}>
+          <Routes>
+            <Route path="/register" element={<Register />} />
+          </Routes>
+        </MemoryRouter>
+    );
+
+    fireEvent.change(getByPlaceholderText('Enter Your Name'), { target: { value: 'John Doe' } });
+    fireEvent.change(getByPlaceholderText('Enter Your Email'), { target: { value: 'test@example.com' } });
+    fireEvent.change(getByPlaceholderText('Enter Your Password'), { target: { value: 'password123' } });
+    fireEvent.change(getByPlaceholderText('Enter Your Phone'), { target: { value: '1234567890' } });
+    fireEvent.change(getByPlaceholderText('Enter Your Address'), { target: { value: '123 Street' } });
+    fireEvent.change(getByPlaceholderText('Enter Your DOB'), { target: { value: '2000-01-01' } });
+    fireEvent.change(getByPlaceholderText('What is Your Favorite sports'), { target: { value: 'Football' } });
+
+    fireEvent.click(getByText('REGISTER'));
+
+    await waitFor(() => expect(axios.post).toHaveBeenCalled());
+
+    expect(toast.error).toHaveBeenCalledWith("Email is not registerd");
   });
 });

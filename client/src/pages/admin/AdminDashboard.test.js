@@ -1,18 +1,19 @@
+// Mervyn Teo Zi Yan, A0273039A
 import React from 'react';
 import { render } from '@testing-library/react';
 import '@testing-library/jest-dom/extend-expect';
-import AdminDashboard from './AdminDashboard'; // Adjust path
+import AdminDashboard from './AdminDashboard';
 import { useAuth } from '../../context/auth';
 
-// 1. Mock the useAuth hook
 jest.mock('../../context/auth', () => ({
     useAuth: jest.fn()
 }));
 
-// 2. Mock Child Components to keep tests focused on the Dashboard logic
+
 jest.mock('../../components/AdminMenu', () => () => <div data-testid="admin-menu">AdminMenu Mock</div>);
 jest.mock('./../../components/Layout', () => ({ children }) => <div data-testid="layout">{children}</div>);
 
+// Written with the aid of Gemini AI
 describe('AdminDashboard Component', () => {
 
     beforeEach(() => {

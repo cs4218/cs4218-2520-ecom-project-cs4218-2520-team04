@@ -35,7 +35,7 @@ const Login = () => {
             },
           });
         setAuth({
-            ...auth,
+            ...(auth || {}),
             user: res.data.user,
             token: res.data.token,
         });
@@ -46,7 +46,11 @@ const Login = () => {
       }
     } catch (error) {
       console.log(error);
-      toast.error("Something went wrong");
+      if (error.response && error.response.data && error.response.data.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Something went wrong");
+      }
     } finally {
       setLoading(false);
     }

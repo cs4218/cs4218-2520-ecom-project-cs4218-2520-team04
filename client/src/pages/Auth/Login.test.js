@@ -1,3 +1,4 @@
+// Mervyn Teo Zi Yan, A0273039A
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import axios from 'axios';
@@ -43,8 +44,9 @@ window.matchMedia = window.matchMedia || function() {
       addListener: function() {},
       removeListener: function() {}
     };
-  };  
+  };
 
+// Written with the aid of Gemini AI
 describe('Login Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -206,5 +208,28 @@ describe('Login Component', () => {
 
         // Verify that the "Forgot Password Page" text appears, proving navigation occurred
         expect(getByText('Forgot Password Page')).toBeInTheDocument();
+    });
+
+    it('should display the specific backend error message on a 404 response', async () => {
+        // Simulate Axios throwing an error with a backend response payload
+        axios.post.mockRejectedValueOnce({
+            response: {
+                data: { success: false, message: "Email is not registerd" }
+            }
+        });
+
+        const { getByPlaceholderText, getByText } = render(
+            <MemoryRouter initialEntries={['/login']}>
+                <Routes><Route path="/login" element={<Login />} /></Routes>
+            </MemoryRouter>
+        );
+
+        fireEvent.change(getByPlaceholderText('Enter Your Email'), { target: { value: 'wrong@example.com' } });
+        fireEvent.change(getByPlaceholderText('Enter Your Password'), { target: { value: 'password123' } });
+        fireEvent.click(getByText('LOGIN'));
+
+        await waitFor(() => expect(axios.post).toHaveBeenCalled());
+
+        expect(toast.error).toHaveBeenCalledWith("Email is not registerd");
     });
 });
