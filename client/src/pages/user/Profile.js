@@ -4,10 +4,12 @@ import Layout from "./../../components/Layout";
 import { useAuth } from "../../context/auth";
 import toast from "react-hot-toast";
 import axios from "axios";
+
 const Profile = () => {
   //context
   const [auth, setAuth] = useAuth();
   //state
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,13 +18,13 @@ const Profile = () => {
 
   //get user data
   useEffect(() => {
-  const { email, name, phone, address } = auth?.user || {};
-  setName(name || "");
-  setPhone(phone || "");
-  setEmail(email || "");
-  setAddress(address || "");
-}, [auth?.user]);
-
+    const { email, name, phone, address } = auth?.user || {};
+    setName(name || "");
+    setPhone(phone || "");
+    setEmail(email || "");
+    setAddress(address || "");
+  }, [auth?.user]);
+  
   // form function
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,21 +36,32 @@ const Profile = () => {
         phone,
         address,
       });
+
       if (data?.error) {
-        toast.error(data?.error);
-      } else {
-        setAuth({ ...auth, user: data?.updatedUser });
-        let ls = localStorage.getItem("auth");
-        ls = JSON.parse(ls);
-        ls.user = data.updatedUser;
-        localStorage.setItem("auth", JSON.stringify(ls));
-        toast.success("Profile Updated Successfully");
+        toast.error(data.error);
+        return;
       }
+
+      setAuth({ ...auth, user: data?.updatedUser });
+
+      // safe localStorage update
+      const raw = localStorage.getItem("auth");
+      let ls;
+      try {
+        ls = raw ? JSON.parse(raw) : {};
+      } catch {
+        ls = {};
+      }
+      ls.user = data?.updatedUser;
+      localStorage.setItem("auth", JSON.stringify(ls));
+
+      toast.success("Profile Updated Successfully");
     } catch (error) {
       console.log(error);
       toast.error("Something went wrong");
     }
   };
+
   return (
     <Layout title={"Your Profile"}>
       <div className="container-fluid m-3 p-3">
@@ -60,6 +73,7 @@ const Profile = () => {
             <div className="form-container ">
               <form onSubmit={handleSubmit}>
                 <h4 className="title">USER PROFILE</h4>
+
                 <div className="mb-3">
                   <input
                     type="text"
@@ -71,6 +85,7 @@ const Profile = () => {
                     autoFocus
                   />
                 </div>
+
                 <div className="mb-3">
                   <input
                     type="email"
@@ -81,6 +96,7 @@ const Profile = () => {
                     disabled
                   />
                 </div>
+
                 <div className="mb-3">
                   <input
                     type="password"
@@ -91,6 +107,7 @@ const Profile = () => {
                     placeholder="Enter Your Password"
                   />
                 </div>
+
                 <div className="mb-3">
                   <input
                     type="text"
@@ -101,6 +118,7 @@ const Profile = () => {
                     placeholder="Enter Your Phone"
                   />
                 </div>
+
                 <div className="mb-3">
                   <input
                     type="text"
