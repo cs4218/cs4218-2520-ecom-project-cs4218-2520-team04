@@ -2,6 +2,7 @@ import React from "react";
 import { useSearch } from "../../context/search";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+
 const SearchInput = () => {
   const [values, setValues] = useSearch();
   const navigate = useNavigate();
@@ -9,8 +10,9 @@ const SearchInput = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const keyword = values?.keyword ?? "";
       const { data } = await axios.get(
-        `/api/v1/product/search/${values.keyword}`
+        `/api/v1/product/search/${encodeURIComponent(keyword)}`
       );
       setValues({ ...values, results: data });
       navigate("/search");
@@ -18,6 +20,7 @@ const SearchInput = () => {
       console.log(error);
     }
   };
+
   return (
     <div>
       <form className="d-flex" role="search" onSubmit={handleSubmit}>
@@ -26,7 +29,7 @@ const SearchInput = () => {
           type="search"
           placeholder="Search"
           aria-label="Search"
-          value={values.keyword}
+          value={values?.keyword ?? ""}
           onChange={(e) => setValues({ ...values, keyword: e.target.value })}
         />
         <button className="btn btn-outline-success" type="submit">
