@@ -56,7 +56,10 @@ describe("createCategoryController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is required",
+    });
   });
 
   // if(category) branch
@@ -93,7 +96,10 @@ describe("createCategoryController", () => {
     // Assert
     expect(categoryModel.findOne).toHaveBeenCalledWith({ name: "Books" });
     expect(slugify).toHaveBeenCalledWith("Books");
-    expect(categoryModel).toHaveBeenCalledWith({ name: "Books", slug: "books" });
+    expect(categoryModel).toHaveBeenCalledWith({
+      name: "Books",
+      slug: "books",
+    });
     expect(saveMock).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.send).toHaveBeenCalledWith({
@@ -153,7 +159,10 @@ describe("createCategoryController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is required",
+    });
   });
 
   test("should return 400 when name is only whitespace", async () => {
@@ -165,7 +174,10 @@ describe("createCategoryController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is required",
+    });
   });
 
   test("should return 400 when name is null", async () => {
@@ -177,7 +189,10 @@ describe("createCategoryController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is required",
+    });
   });
 
   test("should return 500 when name is a non-string type", async () => {
@@ -193,7 +208,7 @@ describe("createCategoryController", () => {
       expect.objectContaining({
         success: false,
         message: "Error in Category",
-      })
+      }),
     );
   });
 
@@ -213,11 +228,13 @@ describe("createCategoryController", () => {
     // Assert — trimmed value used for findOne, slugify, and model constructor
     expect(categoryModel.findOne).toHaveBeenCalledWith({ name: "Books" });
     expect(slugify).toHaveBeenCalledWith("Books");
-    expect(categoryModel).toHaveBeenCalledWith({ name: "Books", slug: "books" });
+    expect(categoryModel).toHaveBeenCalledWith({
+      name: "Books",
+      slug: "books",
+    });
     expect(res.status).toHaveBeenCalledWith(201);
   });
 });
-
 
 // Tan Wei Lian, A0269750U
 describe("updateCategoryController", () => {
@@ -250,7 +267,7 @@ describe("updateCategoryController", () => {
     expect(categoryModel.findByIdAndUpdate).toHaveBeenCalledWith(
       "cat123",
       { name: "Updated Electronics", slug: "updated-electronics" },
-      { new: true }
+      { new: true },
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith({
@@ -291,7 +308,10 @@ describe("updateCategoryController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is required",
+    });
     expect(categoryModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -304,7 +324,10 @@ describe("updateCategoryController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is required",
+    });
     expect(categoryModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -317,7 +340,10 @@ describe("updateCategoryController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is required",
+    });
     expect(categoryModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -334,7 +360,7 @@ describe("updateCategoryController", () => {
       expect.objectContaining({
         success: false,
         message: "Error while updating category",
-      })
+      }),
     );
     expect(categoryModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
@@ -356,7 +382,7 @@ describe("updateCategoryController", () => {
     expect(categoryModel.findByIdAndUpdate).toHaveBeenCalledWith(
       "cat123",
       { name: "Gadgets", slug: "gadgets" },
-      { new: true }
+      { new: true },
     );
     expect(slugify).toHaveBeenCalledWith("Gadgets");
     expect(res.status).toHaveBeenCalledWith(200);
@@ -383,6 +409,134 @@ describe("updateCategoryController", () => {
   });
 });
 
+// Teo Kai Xiang, A20272558U
+// Test cases generated by GPT-5.3-Codex via planning mode. Reviewed and edited by me afterwards
+describe("categoryController", () => {
+  let req, res;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    res = mockRes();
+  });
+
+  describe("Happy Path Tests - when everything works as expected, the controller", () => {
+    test("should return 200 with all categories", async () => {
+      // Arrange
+      req = mockReq();
+      const categories = [
+        { _id: "c1", name: "Electronics", slug: "electronics" },
+        { _id: "c2", name: "Books", slug: "books" },
+      ];
+      categoryModel.find.mockResolvedValue(categories);
+
+      // Act
+      await categoryController(req, res);
+
+      // Assert
+      expect(categoryModel.find).toHaveBeenCalledWith({});
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.send).toHaveBeenCalledWith({
+        success: true,
+        message: "All Categories List",
+        category: categories,
+      });
+    });
+  });
+
+  describe("Unhappy Path Tests - when there are issues, the controller", () => {
+    test("should return 500 when categoryModel.find throws", async () => {
+      // Arrange
+      req = mockReq();
+      const dbError = new Error("Find failed");
+      categoryModel.find.mockRejectedValue(dbError);
+
+      // Act
+      await categoryController(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).toHaveBeenCalledWith({
+        success: false,
+        error: dbError,
+        message: "Error while getting all categories",
+      });
+    });
+  });
+});
+
+// Teo Kai Xiang, A0272558U
+// Test cases generated by GPT-5.3-Codex via planning mode. Reviewed and edited by me afterwards
+describe("singleCategoryController", () => {
+  let req, res;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    res = mockRes();
+  });
+
+  describe("Happy Path Tests - when everything works as expected, the controller", () => {
+    test("should return 200 with single category for a valid slug", async () => {
+      // Arrange
+      req = mockReq({ params: { slug: "electronics" } });
+      const category = { _id: "c1", name: "Electronics", slug: "electronics" };
+      categoryModel.findOne.mockResolvedValue(category);
+
+      // Act
+      await singleCategoryController(req, res);
+
+      // Assert
+      expect(categoryModel.findOne).toHaveBeenCalledWith({
+        slug: "electronics",
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.send).toHaveBeenCalledWith({
+        success: true,
+        message: "Get Single Category Successfully",
+        category,
+      });
+    });
+  });
+
+  describe("Unhappy Path Tests - when there are issues, the controller", () => {
+    test("should return 200 with null category when slug is not found", async () => {
+      // Arrange
+      req = mockReq({ params: { slug: "missing-slug" } });
+      categoryModel.findOne.mockResolvedValue(null);
+
+      // Act
+      await singleCategoryController(req, res);
+
+      // Assert
+      expect(categoryModel.findOne).toHaveBeenCalledWith({
+        slug: "missing-slug",
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.send).toHaveBeenCalledWith({
+        success: true,
+        message: "Get Single Category Successfully",
+        category: null,
+      });
+    });
+
+    test("should return 500 when categoryModel.findOne throws", async () => {
+      // Arrange
+      req = mockReq({ params: { slug: "electronics" } });
+      const dbError = new Error("FindOne failed");
+      categoryModel.findOne.mockRejectedValue(dbError);
+
+      // Act
+      await singleCategoryController(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).toHaveBeenCalledWith({
+        success: false,
+        error: dbError,
+        message: "Error While getting Single Category",
+      });
+    });
+  });
+});
 
 // Tan Wei Lian, A0269750U
 describe("deleteCategoryController", () => {
@@ -484,136 +638,3 @@ describe("deleteCategoryController", () => {
     });
   });
 });
-
-
-/* additional unit tests for reference. may delete accordingly
-describe("categoryController (get all)", () => {
-  let req, res;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    req = mockReq();
-    res = mockRes();
-  });
-
-  test("should return all categories with 200", async () => {
-    // Arrange
-    const categories = [
-      { _id: "1", name: "Electronics", slug: "electronics" },
-      { _id: "2", name: "Books", slug: "books" },
-    ];
-    categoryModel.find.mockResolvedValue(categories);
-
-    // Act
-    await categoryController(req, res);
-
-    // Assert
-    expect(categoryModel.find).toHaveBeenCalledWith({});
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send).toHaveBeenCalledWith({
-      success: true,
-      message: "All Categories List",
-      category: categories,
-    });
-  });
-
-  test("should return an empty array when no categories exist", async () => {
-    // Arrange
-    categoryModel.find.mockResolvedValue([]);
-
-    // Act
-    await categoryController(req, res);
-
-    // Assert
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send).toHaveBeenCalledWith({
-      success: true,
-      message: "All Categories List",
-      category: [],
-    });
-  });
-
-  test("should return 500 when find throws an error", async () => {
-    // Arrange
-    const dbError = new Error("Find failed");
-    categoryModel.find.mockRejectedValue(dbError);
-
-    // Act
-    await categoryController(req, res);
-
-    // Assert
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.send).toHaveBeenCalledWith({
-      success: false,
-      error: dbError,
-      message: "Error while getting all categories",
-    });
-  });
-});
-
-
-describe("singleCategoryController", () => {
-  let req, res;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    res = mockRes();
-  });
-
-  test("should return a single category by slug with 200", async () => {
-    // Arrange
-    const category = { _id: "1", name: "Electronics", slug: "electronics" };
-    req = mockReq({ params: { slug: "electronics" } });
-    categoryModel.findOne.mockResolvedValue(category);
-
-    // Act
-    await singleCategoryController(req, res);
-
-    // Assert
-    expect(categoryModel.findOne).toHaveBeenCalledWith({ slug: "electronics" });
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send).toHaveBeenCalledWith({
-      success: true,
-      message: "Get Single Category Successfully",
-      category,
-    });
-  });
-
-  test("should return category as null when slug does not match", async () => {
-    // Arrange
-    req = mockReq({ params: { slug: "nonexistent" } });
-    categoryModel.findOne.mockResolvedValue(null);
-
-    // Act
-    await singleCategoryController(req, res);
-
-    // Assert
-    expect(categoryModel.findOne).toHaveBeenCalledWith({ slug: "nonexistent" });
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send).toHaveBeenCalledWith({
-      success: true,
-      message: "Get Single Category Successfully",
-      category: null,
-    });
-  });
-
-  test("should return 500 when findOne throws an error", async () => {
-    // Arrange
-    req = mockReq({ params: { slug: "electronics" } });
-    const dbError = new Error("DB read error");
-    categoryModel.findOne.mockRejectedValue(dbError);
-
-    // Act
-    await singleCategoryController(req, res);
-
-    // Assert
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.send).toHaveBeenCalledWith({
-      success: false,
-      error: dbError,
-      message: "Error While getting Single Category",
-    });
-  });
-});
-
-*/

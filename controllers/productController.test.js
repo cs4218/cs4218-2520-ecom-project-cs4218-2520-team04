@@ -3,10 +3,13 @@ import categoryModel from "../models/categoryModel.js";
 import orderModel from "../models/orderModel.js";
 import slugify from "slugify";
 import fs from "fs";
+import * as braintree from "braintree";
 import {
   createProductController,
   deleteProductController,
   updateProductController,
+  braintreePaymentController,
+  braintreeTokenController,
 } from "./productController.js";
 
 // Mock dependencies
@@ -15,16 +18,24 @@ jest.mock("../models/categoryModel.js");
 jest.mock("../models/orderModel.js");
 jest.mock("slugify");
 jest.mock("fs");
-jest.mock("braintree", () => ({
-  BraintreeGateway: jest.fn(() => ({})),
-  Environment: { Sandbox: "sandbox" },
-}));
+jest.mock("braintree", () => {
+  const gateway = {
+    clientToken: { generate: jest.fn() },
+    transaction: { sale: jest.fn() },
+  };
+  return {
+    BraintreeGateway: jest.fn(() => gateway),
+    Environment: { Sandbox: "sandbox" },
+    __mockGateway: gateway,
+  };
+});
 
 // Helpers
 const mockRes = () => {
   const res = {};
   res.status = jest.fn().mockReturnValue(res);
   res.send = jest.fn().mockReturnValue(res);
+  res.json = jest.fn().mockReturnValue(res);
   return res;
 };
 
@@ -50,6 +61,8 @@ const mockReq = (overrides = {}) => ({
   ...overrides,
 });
 
+const getMockBraintreeGateway = () => braintree.__mockGateway;
+
 beforeEach(() => {
   jest.spyOn(console, "log").mockImplementation(() => {});
 });
@@ -57,8 +70,6 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
-
-
 
 // Tan Wei Lian, A0269750U
 describe("createProductController", () => {
@@ -81,7 +92,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is Required",
+    });
   });
 
   test("should return 400 when name is whitespace only", async () => {
@@ -93,9 +107,11 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is Required",
+    });
   });
-
 
   // validate description
   test("should return 400 when description is missing", async () => {
@@ -109,7 +125,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Description is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Description is Required",
+    });
   });
 
   test("should return 400 when description is whitespace only", async () => {
@@ -121,7 +140,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Description is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Description is Required",
+    });
   });
 
   // validate price
@@ -136,7 +158,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is not a number", async () => {
@@ -148,7 +173,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is an empty string", async () => {
@@ -160,7 +188,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is negative", async () => {
@@ -172,7 +203,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is -1 (boundary below 0)", async () => {
@@ -184,7 +218,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should accept price of 0 (free product)", async () => {
@@ -203,7 +240,10 @@ describe("createProductController", () => {
     // Assert — price 0 accepted, product created
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.send).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true, message: "Product Created Successfully" })
+      expect.objectContaining({
+        success: true,
+        message: "Product Created Successfully",
+      }),
     );
   });
 
@@ -217,7 +257,10 @@ describe("createProductController", () => {
 
     // Assert — passes price validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   // validate category
@@ -232,7 +275,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category is Required",
+    });
   });
 
   // validate quantity
@@ -247,7 +293,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when quantity is not a number", async () => {
@@ -259,7 +308,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when quantity is negative", async () => {
@@ -271,7 +323,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when quantity is -1 (boundary below 0)", async () => {
@@ -283,7 +338,10 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should accept quantity of 0 (out of stock)", async () => {
@@ -302,7 +360,10 @@ describe("createProductController", () => {
     // Assert — quantity 0 accepted, product created
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.send).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true, message: "Product Created Successfully" })
+      expect.objectContaining({
+        success: true,
+        message: "Product Created Successfully",
+      }),
     );
   });
 
@@ -316,7 +377,10 @@ describe("createProductController", () => {
 
     // Assert — passes quantity validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   // validate photo
@@ -329,25 +393,37 @@ describe("createProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Photo is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Photo is Required",
+    });
   });
 
   test("should return 400 when photo exceeds 1MB", async () => {
     // Arrange
-    const req = mockReq({ files: { photo: { size: 1000001, path: "/tmp/big.jpg", type: "image/jpeg" } } });
+    const req = mockReq({
+      files: {
+        photo: { size: 1000001, path: "/tmp/big.jpg", type: "image/jpeg" },
+      },
+    });
 
     // Act
     await createProductController(req, res);
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Photo should be less than 1mb" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Photo should be less than 1mb",
+    });
   });
 
   test("should accept photo of exactly 1000000 bytes (boundary at limit)", async () => {
     // Arrange — size === 1000000 passes because check is > not >=
     const req = mockReq({
-      files: { photo: { size: 1000000, path: "/tmp/photo.jpg", type: "image/jpeg" } },
+      files: {
+        photo: { size: 1000000, path: "/tmp/photo.jpg", type: "image/jpeg" },
+      },
     });
     categoryModel.findById.mockResolvedValue(null);
 
@@ -356,13 +432,18 @@ describe("createProductController", () => {
 
     // Assert — passes photo validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   test("should accept photo of 999999 bytes (boundary below limit)", async () => {
     // Arrange
     const req = mockReq({
-      files: { photo: { size: 999999, path: "/tmp/photo.jpg", type: "image/jpeg" } },
+      files: {
+        photo: { size: 999999, path: "/tmp/photo.jpg", type: "image/jpeg" },
+      },
     });
     categoryModel.findById.mockResolvedValue(null);
 
@@ -371,7 +452,10 @@ describe("createProductController", () => {
 
     // Assert — passes photo validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   // validate category
@@ -386,7 +470,10 @@ describe("createProductController", () => {
     // Assert
     expect(categoryModel.findById).toHaveBeenCalledWith("cat123");
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   // happy path
@@ -407,7 +494,7 @@ describe("createProductController", () => {
     // Assert
     expect(slugify).toHaveBeenCalledWith("Test Product");
     expect(productModel).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Test Product", slug: "test-product" })
+      expect.objectContaining({ name: "Test Product", slug: "test-product" }),
     );
     expect(fs.readFileSync).toHaveBeenCalledWith("/tmp/photo.jpg");
     expect(productInstance.photo.data).toEqual(Buffer.from("photo-data"));
@@ -415,14 +502,21 @@ describe("createProductController", () => {
     expect(saveMock).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.send).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true, message: "Product Created Successfully" })
+      expect.objectContaining({
+        success: true,
+        message: "Product Created Successfully",
+      }),
     );
   });
 
   test("should trim name and description before saving", async () => {
     // Arrange — both have surrounding whitespace
     const req = mockReq({
-      fields: { ...validFields(), name: "  Padded Name  ", description: "  Padded Desc  " },
+      fields: {
+        ...validFields(),
+        name: "  Padded Name  ",
+        description: "  Padded Desc  ",
+      },
     });
     categoryModel.findById.mockResolvedValue({ _id: "cat123" });
     slugify.mockReturnValue("padded-name");
@@ -441,7 +535,7 @@ describe("createProductController", () => {
         name: "Padded Name",
         description: "Padded Desc",
         slug: "padded-name",
-      })
+      }),
     );
     expect(res.status).toHaveBeenCalledWith(201);
   });
@@ -594,7 +688,7 @@ describe("deleteProductController", () => {
       expect.objectContaining({
         success: false,
         message: "Error while deleting product",
-      })
+      }),
     );
   });
 });
@@ -627,7 +721,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is Required",
+    });
   });
 
   test("should return 400 when name is whitespace only", async () => {
@@ -642,7 +739,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Name is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Name is Required",
+    });
   });
 
   test("should return 400 when description is missing", async () => {
@@ -656,7 +756,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Description is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Description is Required",
+    });
   });
 
   test("should return 400 when description is whitespace only", async () => {
@@ -671,7 +774,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Description is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Description is Required",
+    });
   });
 
   test("should return 400 when price is missing", async () => {
@@ -685,7 +791,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is not a number", async () => {
@@ -700,7 +809,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is an empty string", async () => {
@@ -715,7 +827,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is negative", async () => {
@@ -730,7 +845,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when price is -1 (boundary below 0)", async () => {
@@ -745,7 +863,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Price is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Price is Required and must be a non-negative number",
+    });
   });
 
   test("should accept price of 0", async () => {
@@ -762,7 +883,10 @@ describe("updateProductController", () => {
 
     // Assert — passes price check, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   test("should accept price of 1 (boundary above 0)", async () => {
@@ -779,7 +903,10 @@ describe("updateProductController", () => {
 
     // Assert — passes price validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   test("should return 400 when category is missing", async () => {
@@ -793,7 +920,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category is Required" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category is Required",
+    });
   });
 
   test("should return 400 when quantity is missing", async () => {
@@ -807,7 +937,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when quantity is not a number", async () => {
@@ -822,7 +955,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when quantity is negative", async () => {
@@ -837,7 +973,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should return 400 when quantity is -1 (boundary below 0)", async () => {
@@ -852,7 +991,10 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Quantity is Required and must be a non-negative number" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Quantity is Required and must be a non-negative number",
+    });
   });
 
   test("should accept quantity of 0", async () => {
@@ -869,7 +1011,10 @@ describe("updateProductController", () => {
 
     // Assert — passes quantity check, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   test("should accept quantity of 1 (boundary above 0)", async () => {
@@ -886,13 +1031,18 @@ describe("updateProductController", () => {
 
     // Assert — passes quantity validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   test("should return 400 when photo exceeds 1MB", async () => {
     // Arrange
     const req = mockReq({
-      files: { photo: { size: 1000001, path: "/tmp/big.jpg", type: "image/jpeg" } },
+      files: {
+        photo: { size: 1000001, path: "/tmp/big.jpg", type: "image/jpeg" },
+      },
       params: { pid: "p1" },
     });
 
@@ -901,13 +1051,18 @@ describe("updateProductController", () => {
 
     // Assert
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Photo should be less than 1mb" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Photo should be less than 1mb",
+    });
   });
 
   test("should accept photo of exactly 1000000 bytes (boundary at limit)", async () => {
     // Arrange — size === 1000000 passes because check is > not >=
     const req = mockReq({
-      files: { photo: { size: 1000000, path: "/tmp/photo.jpg", type: "image/jpeg" } },
+      files: {
+        photo: { size: 1000000, path: "/tmp/photo.jpg", type: "image/jpeg" },
+      },
       params: { pid: "p1" },
     });
     categoryModel.findById.mockResolvedValue(null);
@@ -917,13 +1072,18 @@ describe("updateProductController", () => {
 
     // Assert — passes photo validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   test("should accept photo of 999999 bytes (boundary below limit)", async () => {
     // Arrange
     const req = mockReq({
-      files: { photo: { size: 999999, path: "/tmp/photo.jpg", type: "image/jpeg" } },
+      files: {
+        photo: { size: 999999, path: "/tmp/photo.jpg", type: "image/jpeg" },
+      },
       params: { pid: "p1" },
     });
     categoryModel.findById.mockResolvedValue(null);
@@ -933,7 +1093,10 @@ describe("updateProductController", () => {
 
     // Assert — passes photo validation, fails at category lookup
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   // --- Category & product lookup ---
@@ -949,7 +1112,10 @@ describe("updateProductController", () => {
     // Assert
     expect(categoryModel.findById).toHaveBeenCalledWith("cat123");
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.send).toHaveBeenCalledWith({ success: false, message: "Category not found" });
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Category not found",
+    });
   });
 
   test("should return 404 when product does not exist", async () => {
@@ -987,13 +1153,16 @@ describe("updateProductController", () => {
     expect(productModel.findByIdAndUpdate).toHaveBeenCalledWith(
       "p1",
       expect.objectContaining({ name: "Test Product", slug: "test-product" }),
-      { new: true }
+      { new: true },
     );
     expect(fs.readFileSync).not.toHaveBeenCalled();
     expect(updatedProduct.save).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true, message: "Product Updated Successfully" })
+      expect.objectContaining({
+        success: true,
+        message: "Product Updated Successfully",
+      }),
     );
   });
 
@@ -1021,7 +1190,11 @@ describe("updateProductController", () => {
   test("should trim name and description before updating", async () => {
     // Arrange
     const req = mockReq({
-      fields: { ...validFields(), name: "  Padded  ", description: "  Padded Desc  " },
+      fields: {
+        ...validFields(),
+        name: "  Padded  ",
+        description: "  Padded Desc  ",
+      },
       params: { pid: "p1" },
       files: {},
     });
@@ -1041,7 +1214,7 @@ describe("updateProductController", () => {
         description: "Padded Desc",
         slug: "padded",
       }),
-      { new: true }
+      { new: true },
     );
     expect(res.status).toHaveBeenCalledWith(200);
   });
@@ -1088,6 +1261,193 @@ describe("updateProductController", () => {
       success: false,
       error: saveError,
       message: "Error in Update product",
+    });
+  });
+});
+
+// Teo Kai Xiang, A0272558U
+// Test cases generated by GPT-5.3-Codex via planning mode. Reviewed and edited by me afterwards
+describe("braintreeTokenController", () => {
+  let req, res;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    req = mockReq();
+    res = mockRes();
+  });
+
+  describe("Happy Path Tests - when everything works as expected, the controller", () => {
+    test("should return generated braintree client token response", async () => {
+      // Arrange
+      const responseObj = { clientToken: "token-123" };
+      getMockBraintreeGateway().clientToken.generate.mockImplementationOnce(
+        (payload, callback) => callback(null, responseObj),
+      );
+
+      // Act
+      await braintreeTokenController(req, res);
+
+      // Assert
+      expect(
+        getMockBraintreeGateway().clientToken.generate,
+      ).toHaveBeenCalledWith({}, expect.any(Function));
+      expect(res.send).toHaveBeenCalledWith(responseObj);
+      expect(res.status).not.toHaveBeenCalledWith(500);
+    });
+  });
+
+  describe("Unhappy Path Tests - when there are issues, the controller", () => {
+    test("should return 500 when braintree generate returns an error", async () => {
+      // Arrange
+      const errObj = new Error("token generation failed");
+      getMockBraintreeGateway().clientToken.generate.mockImplementationOnce(
+        (payload, callback) => callback(errObj, null),
+      );
+
+      // Act
+      await braintreeTokenController(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).toHaveBeenCalledWith(errObj);
+    });
+
+    test("should log when generate throws synchronously", async () => {
+      // Arrange
+      getMockBraintreeGateway().clientToken.generate.mockImplementationOnce(
+        () => {
+          throw new Error("sync token throw");
+        },
+      );
+
+      // Act
+      await braintreeTokenController(req, res);
+
+      // Assert
+      expect(console.log).toHaveBeenCalled();
+      expect(res.send).not.toHaveBeenCalled();
+      expect(res.json).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// Teo Kai Xiang, A0272558U
+// Test cases generated by GPT-5.3-Codex via planning mode. Reviewed and edited by me afterwards
+describe("braintreePaymentController", () => {
+  let req, res;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    res = mockRes();
+  });
+
+  describe("Happy Path Tests - when everything works as expected, the controller", () => {
+    test("should process payment, save order, and return ok true", async () => {
+      // Arrange
+      const cart = [
+        { _id: "p1", price: 10 },
+        { _id: "p2", price: 15 },
+      ];
+      const nonce = "nonce-123";
+      const buyerId = "buyer123";
+      const resultObj = { transaction: { id: "txn-1" } };
+      const saveMock = jest.fn().mockResolvedValue({ _id: "order1" });
+      orderModel.mockImplementation(() => ({ save: saveMock }));
+      req = mockReq({
+        body: { nonce, cart },
+        user: { _id: buyerId },
+      });
+      getMockBraintreeGateway().transaction.sale.mockImplementationOnce(
+        (payload, callback) => callback(null, resultObj),
+      );
+
+      // Act
+      await braintreePaymentController(req, res);
+
+      // Assert
+      expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
+        {
+          amount: 25,
+          paymentMethodNonce: nonce,
+          options: { submitForSettlement: true },
+        },
+        expect.any(Function),
+      );
+      expect(orderModel).toHaveBeenCalledWith({
+        products: cart,
+        payment: resultObj,
+        buyer: buyerId,
+      });
+      expect(saveMock).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({ ok: true });
+    });
+
+    test("should compute total amount correctly for multi-item cart", async () => {
+      // Arrange
+      const cart = [
+        { _id: "p1", price: 29.99 },
+        { _id: "p2", price: 50 },
+        { _id: "p3", price: 20.01 },
+      ];
+      const saveMock = jest.fn().mockResolvedValue({ _id: "order2" });
+      orderModel.mockImplementation(() => ({ save: saveMock }));
+      req = mockReq({
+        body: { nonce: "nonce-456", cart },
+        user: { _id: "buyer456" },
+      });
+      getMockBraintreeGateway().transaction.sale.mockImplementationOnce(
+        (payload, callback) => callback(null, { transaction: { id: "txn-2" } }),
+      );
+
+      // Act
+      await braintreePaymentController(req, res);
+
+      // Assert
+      expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 100 }),
+        expect.any(Function),
+      );
+      expect(res.json).toHaveBeenCalledWith({ ok: true });
+    });
+  });
+
+  describe("Unhappy Path Tests - when there are issues, the controller", () => {
+    test("should return 500 when sale callback returns error and no result", async () => {
+      // Arrange
+      const errorObj = new Error("payment failed");
+      req = mockReq({
+        body: { nonce: "nonce-fail", cart: [{ _id: "p1", price: 10 }] },
+        user: { _id: "buyer-fail" },
+      });
+      getMockBraintreeGateway().transaction.sale.mockImplementationOnce(
+        (payload, callback) => callback(errorObj, null),
+      );
+
+      // Act
+      await braintreePaymentController(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).toHaveBeenCalledWith(errorObj);
+      expect(orderModel).not.toHaveBeenCalled();
+    });
+
+    test("should log when transaction.sale throws synchronously", async () => {
+      // Arrange
+      req = mockReq({
+        body: { nonce: "nonce-sync-throw", cart: [{ _id: "p1", price: 10 }] },
+        user: { _id: "buyer-sync" },
+      });
+      getMockBraintreeGateway().transaction.sale.mockImplementationOnce(() => {
+        throw new Error("sync sale throw");
+      });
+
+      // Act
+      await braintreePaymentController(req, res);
+
+      // Assert
+      expect(console.log).toHaveBeenCalled();
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 });
