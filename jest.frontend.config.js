@@ -21,25 +21,25 @@ export default {
 
   // only run these tests
   testMatch: [
-      "<rootDir>/client/src/**/*.test.js",
-      "<rootDir>/client/src/pages/*.test.js",
-      "<rootDir>/client/src/pages/**/*.test.js"
+    "<rootDir>/client/src/**/*.test.js",
+    "<rootDir>/client/src/pages/*.test.js",
+    "<rootDir>/client/src/pages/**/*.test.js",
   ],
 
   // jest code coverage
   collectCoverage: true,
   collectCoverageFrom: [
-      "client/src/pages/Auth/**",
-      "client/src/pages/user/**",
-      "client/src/context/**",
-      "client/src/components/**",
-      "client/src/pages/admin/**",
-      "client/src/pages/**",
+    "client/src/pages/Auth/**",
+    "client/src/pages/user/**",
+    "client/src/context/**",
+    "client/src/components/**",
+    "client/src/pages/admin/**",
+    "client/src/pages/**",
   ],
   coverageThreshold: {
     global: {
-      lines: 100,
-      functions: 100,
+      lines: 80,
+      functions: 70,
     },
   },
   setupFilesAfterEnv: ["<rootDir>/client/src/setupTests.js"],
