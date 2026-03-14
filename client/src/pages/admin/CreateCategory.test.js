@@ -16,7 +16,16 @@ jest.mock("antd", () => {
   const React = require("react");
   const Modal = ({ children, visible, onCancel }) =>
     visible
-      ? React.createElement("div", { "data-testid": "modal" }, children)
+      ? React.createElement(
+          "div",
+          { "data-testid": "modal" },
+          React.createElement(
+            "button",
+            { type: "button", "data-testid": "modal-cancel", onClick: onCancel },
+            "Close"
+          ),
+          children
+        )
       : null;
   const Badge = ({ children }) => React.createElement("span", null, children);
   return { Modal, Badge };
@@ -263,6 +272,28 @@ describe("CreateCategory", () => {
     // Assert
     await waitFor(() => {
       expect(screen.getByTestId("modal")).toBeInTheDocument();
+    });
+  });
+
+  test("should close edit modal when modal onCancel is triggered", async () => {
+    render(
+      <MemoryRouter>
+        <CreateCategory />
+      </MemoryRouter>
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Electronics")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText("Edit")[0]);
+    await waitFor(() => {
+      expect(screen.getByTestId("modal")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("modal-cancel"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("modal")).not.toBeInTheDocument();
     });
   });
 

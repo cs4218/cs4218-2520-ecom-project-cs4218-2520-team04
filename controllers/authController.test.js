@@ -650,7 +650,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
                 expect(orderModel.find).toHaveBeenCalledWith({});
                 expect(populate1).toHaveBeenCalledWith("products", "-photo");
                 expect(populate2).toHaveBeenCalledWith("buyer", "name");
-                expect(sortMock).toHaveBeenCalledWith({ createdAt: "-1" });
+                expect(sortMock).toHaveBeenCalledWith({ createdAt: -1 });
                 expect(res.json).toHaveBeenCalledWith(mockOrders);
             });
 
