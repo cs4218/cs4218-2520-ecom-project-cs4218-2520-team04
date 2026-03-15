@@ -17,8 +17,8 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import authRoute from "../../routes/authRoute.js";
-import userModel from "../../models/userModel.js";
+import authRoute from "../../../routes/authRoute.js";
+import userModel from "../../../models/userModel.js";
 
 process.env.JWT_SECRET = "test-jwt-secret-usermodel";
 

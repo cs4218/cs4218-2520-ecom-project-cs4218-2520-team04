@@ -5,7 +5,7 @@ import {
     testController,
     updateProfileController,
     getOrdersController,
-    getAllOrdersController,
+getAllOrdersController,
     orderStatusController
 } from "./authController";
 import orderModel from "../models/orderModel.js";
@@ -327,7 +327,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
     });
 
     // --- UPDATE PROFILE TESTS ---
-    describe("updateProfileController", () => {
+    describe("updateProfileController", () => { // Lu Yixuan, Deborah, A0277911X
         it("should not return the password hash when a user updates their profile without changing password", async () => {
             req.user = { _id: "user123" };
             req.body = { name: "New Name", password: "", phone: "111", address: "NewAddr" };
@@ -594,7 +594,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
     });
 
     // --- ORDER TESTS ---
-    describe("Order Controllers", () => {
+    describe("Order Controllers", () => { // Lu Yixuan, Deborah, A0277911X
         describe("getOrdersController", () => {
             it("should return orders for the logged-in user", async () => {
                 req.user = { _id: "user123" };
@@ -707,5 +707,4 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
             });
         });
     });
-
 });

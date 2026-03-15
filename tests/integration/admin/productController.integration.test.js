@@ -14,11 +14,11 @@ import request from "supertest";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import productRoutes from "../../routes/productRoutes.js";
-import productModel from "../../models/productModel.js";
-import categoryModel from "../../models/categoryModel.js";
-import orderModel from "../../models/orderModel.js";
-import userModel from "../../models/userModel.js";
+import productRoutes from "../../../routes/productRoutes.js";
+import productModel from "../../../models/productModel.js";
+import categoryModel from "../../../models/categoryModel.js";
+import orderModel from "../../../models/orderModel.js";
+import userModel from "../../../models/userModel.js";
 
 // Use a fixed test secret so auth middleware and token signing agree
 process.env.JWT_SECRET = "test-jwt-secret-integration";
