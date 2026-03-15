@@ -2119,6 +2119,20 @@ describe("productFiltersController", () => {
     });
   });
 
+  test("should default checked and radio to empty arrays when omitted from request body", async () => {
+    req.body = {};
+    const mockProducts = [{ _id: "1" }];
+    productModel.find.mockResolvedValue(mockProducts);
+
+    await productFiltersController(req, res);
+
+    expect(productModel.find).toHaveBeenCalledWith({});
+    expect(res.send).toHaveBeenCalledWith({
+      success: true,
+      products: mockProducts,
+    });
+  });
+
   // Error handling
   test("should handle errors gracefully", async () => {
     const error = new Error("Error While Filtering Products");

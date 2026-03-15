@@ -164,6 +164,47 @@ describe("UpdateProduct", () => {
     appendSpy.mockRestore();
   });
 
+  test("should apply edited description, category and shipping changes before update", async () => {
+    axios.put.mockResolvedValue({
+      data: { success: true, message: "Product Updated Successfully" },
+    });
+    const appendSpy = jest.spyOn(FormData.prototype, "append");
+
+    render(<MemoryRouter><UpdateProduct /></MemoryRouter>);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Test Product")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("write a description"), {
+      target: { value: "Updated Description" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("write a Price"), {
+      target: { value: "35.5" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("write a quantity"), {
+      target: { value: "12" },
+    });
+    fireEvent.change(screen.getByTestId("select-Select-a-category"), {
+      target: { value: "cat2" },
+    });
+    fireEvent.change(screen.getByTestId("select-Select-Shipping-"), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByText("UPDATE PRODUCT"));
+
+    await waitFor(() => {
+      expect(axios.put).toHaveBeenCalledWith(
+        "/api/v1/product/update-product/p1",
+        expect.any(FormData)
+      );
+    });
+    expect(appendSpy).toHaveBeenCalledWith("description", "Updated Description");
+    expect(appendSpy).toHaveBeenCalledWith("price", "35.5");
+    expect(appendSpy).toHaveBeenCalledWith("quantity", "12");
+    expect(appendSpy).toHaveBeenCalledWith("category", "cat2");
+    appendSpy.mockRestore();
+  });
+
   test("should show error toast when update returns success: false", async () => {
     // Arrange
     axios.put.mockResolvedValue({
@@ -305,6 +346,68 @@ describe("UpdateProduct", () => {
         "/api/v1/product/get-product/test-product"
       );
     });
+  });
+
+  test("should show error toast when getAllCategory API fails", async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes("get-product")) {
+        return Promise.resolve({ data: { product: mockProduct } });
+      }
+      if (url.includes("get-category")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.reject(new Error("Unknown URL"));
+    });
+
+    render(<MemoryRouter><UpdateProduct /></MemoryRouter>);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "Something went wrong in getting category"
+      );
+    });
+  });
+
+  test("should not populate categories when getAllCategory returns success false", async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes("get-product")) {
+        return Promise.resolve({ data: { product: mockProduct } });
+      }
+      if (url.includes("get-category")) {
+        return Promise.resolve({ data: { success: false, category: mockCategories } });
+      }
+      return Promise.reject(new Error("Unknown URL"));
+    });
+
+    render(<MemoryRouter><UpdateProduct /></MemoryRouter>);
+
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalledWith("/api/v1/category/get-category");
+    });
+    expect(screen.queryByText("Electronics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Books")).not.toBeInTheDocument();
+  });
+
+  test("should append photo into FormData when updating with a new uploaded file", async () => {
+    axios.put.mockResolvedValue({ data: { success: true } });
+    const appendSpy = jest.spyOn(FormData.prototype, "append");
+
+    render(<MemoryRouter><UpdateProduct /></MemoryRouter>);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Test Product")).toBeInTheDocument();
+    });
+
+    const file = new File(["img"], "new-photo.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByLabelText("Upload Photo"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByText("UPDATE PRODUCT"));
+
+    await waitFor(() => {
+      expect(axios.put).toHaveBeenCalled();
+    });
+    expect(appendSpy).toHaveBeenCalledWith("photo", file);
+    appendSpy.mockRestore();
   });
 
   test("should display category options in the dropdown", async () => {

@@ -194,6 +194,19 @@ describe("CreateProduct", () => {
     appendSpy.mockRestore();
   });
 
+  test("should handle shipping selection from shipping dropdown", async () => {
+    render(<MemoryRouter><CreateProduct /></MemoryRouter>);
+    await waitFor(() => {
+      expect(screen.getByText("Electronics")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId("select-Select-Shipping-"), {
+      target: { value: "1" },
+    });
+
+    expect(screen.getByTestId("select-Select-Shipping-").value).toBe("1");
+  });
+
   test("should show error toast when create returns success: false", async () => {
     // Arrange
     axios.post.mockResolvedValue({
@@ -246,6 +259,20 @@ describe("CreateProduct", () => {
         "Something went wrong in getting category"
       );
     });
+  });
+
+  test("should not populate categories when get-category returns success false", async () => {
+    axios.get.mockResolvedValue({
+      data: { success: false, category: mockCategories },
+    });
+
+    render(<MemoryRouter><CreateProduct /></MemoryRouter>);
+
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalledWith("/api/v1/category/get-category");
+    });
+    expect(screen.queryByText("Electronics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Books")).not.toBeInTheDocument();
   });
 
   test("should show photo name after file upload", async () => {
