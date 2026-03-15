@@ -33,7 +33,7 @@
 
 ## Testing Workload Distribution (MS2)
 
-| Done by | Test Type | Scope (bullet points) | Test Files |
+| Done by | Test Type | Scope | Test Files |
 |---|---|---|---|
 | Lu Yixuan, Deborah | Integration (Jest + Supertest + MongoMemoryServer) | - Orders endpoints<br>- Profile update endpoint<br>- Admin users endpoint  | `tests/integration/admin/adminUsers.integration.test.js`<br>`tests/integration/auth/orders.integration.test.js`<br>`tests/integration/auth/profile.integration.test.js` |
 | Lu Yixuan, Deborah | UI / E2E (Playwright) | - User orders page flow<br>- User profile update flow<br>- Admin users authorization | `tests/ui/user/user-orders.spec.js`<br>`tests/ui/user/user-profile.spec.js`<br>`tests/ui/admin/admin-users.spec.js` |
