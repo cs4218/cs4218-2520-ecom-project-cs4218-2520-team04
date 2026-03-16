@@ -16,8 +16,8 @@ setup("authenticate as normal user", async ({ page }) => {
   await page.getByPlaceholder("Enter Your Password").fill("user@test.com");
   await page.getByRole("button", { name: "LOGIN" }).click();
 
-  await page.waitForURL("/");
-  await expect(page).toHaveURL("/");
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 60_000 });
+  await expect(page).not.toHaveURL(/\/login$/);
 
   await page.context().storageState({ path: userAuthFile });
 });

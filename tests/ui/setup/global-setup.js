@@ -6,7 +6,7 @@
 
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { writeFileSync } from "fs";
+import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
 dotenv.config();
@@ -49,7 +49,11 @@ export default async function globalSetup() {
   });
 
   // Persist ID for teardown
-  const tmpPath = join(process.cwd(), "playwright", ".seed-order-id.json");
+  const tmpDir = join(process.cwd(), "playwright");
+  // Ensure the playwright/ folder exists before writing seed metadata (prevents ENOENT on fresh machines/CI)
+  mkdirSync(tmpDir, { recursive: true });
+
+  const tmpPath = join(tmpDir, ".seed-order-id.json");
   writeFileSync(tmpPath, JSON.stringify({ orderId: order._id.toString() }));
 
   await mongoose.disconnect();
