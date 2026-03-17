@@ -7,8 +7,8 @@ const { defineConfig, devices } = require("@playwright/test");
  * Client:  http://localhost:3000  (CRA dev server, proxies /api/* to 6060)
  */
 module.exports = defineConfig({
-  globalSetup: "./tests/ui/global-setup.js",
-  globalTeardown: "./tests/ui/global-teardown.js",
+  globalSetup: "./tests/ui/setup/global-setup.js",
+  globalTeardown: "./tests/ui/setup/global-teardown.js",
   testDir: "./tests/ui",
   /* Serial execution keeps CRUD state consistent across dependent tests */
   fullyParallel: false,
@@ -24,10 +24,17 @@ module.exports = defineConfig({
   },
 
   projects: [
-    // Phase 1 — save admin auth to playwright/.auth.json
+    // Phase 1a — save admin auth to playwright/.auth.json
     {
       name: "auth-setup",
       testMatch: /auth\.setup\.js/,
+    },
+
+    // Phase 1b — save normal user auth to playwright/.user\.auth\.json
+    {
+      name: "user-setup",
+      testMatch: /user\.setup\.js/,
+      dependencies: ["auth-setup"], // optional; remove if not needed
     },
     // Phase 2 — all tests run with admin session
     {
