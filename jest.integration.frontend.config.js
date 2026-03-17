@@ -9,7 +9,10 @@ export default {
   },
   transformIgnorePatterns: ["/node_modules/(?!(styleMock\\.js)$)"],
   testMatch: [
+    "<rootDir>/tests/integration/frontend/*.integration.test.js",
     "<rootDir>/client/src/pages/admin/*.integration.test.js",
+    "<rootDir>/client/src/components/*.integration.test.js",
+    "<rootDir>/client/src/pages/*.integration.test.js"
   ],
   collectCoverage: false,
   setupFilesAfterEnv: ["<rootDir>/client/src/setupTests.js"],

@@ -1,6 +1,6 @@
 export default {
-  displayName: "integration",
-  testEnvironment: "node",
-  testMatch: ["<rootDir>/tests/integration/**/*.test.js"],
-  collectCoverage: false,
+  projects: [
+    "<rootDir>/jest.integration.backend.config.js",
+    "<rootDir>/jest.integration.frontend.config.js"
+  ]
 };
