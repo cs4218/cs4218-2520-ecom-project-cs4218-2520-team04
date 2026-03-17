@@ -14,6 +14,5 @@ export default {
     "<rootDir>/client/src/components/*.integration.test.js",
     "<rootDir>/client/src/pages/*.integration.test.js"
   ],
-  collectCoverage: false,
   setupFilesAfterEnv: ["<rootDir>/client/src/setupTests.js"],
 };

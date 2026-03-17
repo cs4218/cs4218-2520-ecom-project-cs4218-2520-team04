@@ -22,6 +22,13 @@ import CreateCategory from "./CreateCategory";
 jest.mock("axios");
 jest.mock("react-hot-toast");
 
+// silence console noise in tests
+beforeAll(() => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+});
+
 // Mock antd for stable modal testing in jsdom
 jest.mock("antd", () => {
   const React = require("react");

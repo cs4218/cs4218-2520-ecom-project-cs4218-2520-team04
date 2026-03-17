@@ -22,6 +22,13 @@ import userModel from "../../../models/userModel.js";
 // Use a fixed test secret so auth middleware and token signing agree
 process.env.JWT_SECRET = "test-jwt-secret-integration";
 
+// silence console noise in tests
+beforeAll(() => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+});
+
 // Suppress console.log from middleware (expected JWT errors in auth tests)
 beforeEach(() => jest.spyOn(console, "log").mockImplementation(() => {}));
 

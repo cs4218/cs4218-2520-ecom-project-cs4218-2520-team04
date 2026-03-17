@@ -20,6 +20,13 @@ import CreateProduct from "./CreateProduct";
 jest.mock("axios");
 jest.mock("react-hot-toast");
 
+// silence console noise in tests
+beforeAll(() => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+});
+
 // Mock antd components for stable rendering in jsdom
 jest.mock("antd", () => {
   const React = require("react");

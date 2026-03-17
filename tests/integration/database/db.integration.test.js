@@ -28,21 +28,28 @@ let mongoServer; // For in-memory MongoDB server
 
 // Creates a new in-memory MongoDB server
 beforeAll(async () => { // catch the promise
-    jest.spyOn(console, 'log').mockImplementation(() => {}); // silents all logs
     mongoServer = await MongoMemoryServer.create(); // returns a promise
+});
+
+// silence all logs
+beforeEach(() => {
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+// Disconnect connection to in-memory MongoDB after each test to ensure clean state for the next test
+afterEach(async () => {
+    jest.restoreAllMocks();
+    if (mongoose.connection.readyState !== 0) { 
+        await mongoose.disconnect();
+    }
 });
 
 // Shutdown server after all tests
 afterAll(async () => {
     await mongoServer.stop(); 
     jest.restoreAllMocks();
-});
-
-// Disconnect connection to in-memory MongoDB after each test to ensure clean state for the next test
-afterEach(async () => {
-    if (mongoose.connection.readyState !== 0) { 
-        await mongoose.disconnect();
-    }
 });
 
 it("should connect to MongoDB successfully with a ready state of 1", async () => {
@@ -68,9 +75,6 @@ it("should log a success message if connection to MongoDB is successful", async 
     expect(mockConsoleLog).toHaveBeenCalledWith(
         expect.stringContaining("Connected To Mongodb Database")
     );
-    
-    // Restore original console.log after the test
-    mockConsoleLog.mockRestore();
 });
 
 it("should log an error message if connection to MongoDB fails", async () => {
@@ -86,9 +90,6 @@ it("should log an error message if connection to MongoDB fails", async () => {
     expect(mockConsoleLog).toHaveBeenCalledWith(
         expect.stringContaining("Error in Mongodb")
     );
-    
-    // Restore original console.log after the test
-    mockConsoleLog.mockRestore();
 });
 
 it("should allow for subsequent successful connection to MongoDB after a failed connection attempt", async () => {
@@ -105,12 +106,11 @@ it("should allow for subsequent successful connection to MongoDB after a failed 
  
     // Restore mocks to allow for a successful connection on the second attempt
     jest.restoreAllMocks();
+    jest.spyOn(console, "log").mockImplementation(() => {});
 
     // Second attempt to connect to MongoDB should succeed
     process.env.MONGO_URL = mongoServer.getUri();
     await connectDB();
     expect(mongoose.connection.readyState).toBe(1);
- 
-    // Restore console.log mock after the test
-    consoleSpy.mockRestore();
 });
+
