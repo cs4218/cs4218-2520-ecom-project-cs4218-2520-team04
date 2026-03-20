@@ -26,6 +26,7 @@ describe('AdminMenu Component', () => {
         expect(getByText('Create Product')).toBeInTheDocument();
         expect(getByText('Products')).toBeInTheDocument();
         expect(getByText('Orders')).toBeInTheDocument();
+        expect(getByText('Users')).toBeInTheDocument();
     });
 
     it('navigation links have correct "to" attributes', () => {
@@ -51,6 +52,10 @@ describe('AdminMenu Component', () => {
             'href',
             '/dashboard/admin/orders'
         );
+        expect(getByText('Users').closest('a')).toHaveAttribute(
+            'href',
+            '/dashboard/admin/users'
+        );
     });
 
     it('should have active bootstrap classes for styling', () => {
@@ -64,7 +69,8 @@ describe('AdminMenu Component', () => {
             'Create Category',
             'Create Product',
             'Products',
-            'Orders'
+            'Orders',
+            'Users'
         ];
 
         links.forEach(linkText => {
@@ -83,6 +89,6 @@ describe('AdminMenu Component', () => {
 
         const usersLink = getByText('Users');
         expect(usersLink).toBeInTheDocument();
-        expect(usersLink).toHaveAttribute('href', '/dashboard/admin/users');
+        expect(usersLink.closest('a')).toHaveAttribute('href', '/dashboard/admin/users');
     });
 });

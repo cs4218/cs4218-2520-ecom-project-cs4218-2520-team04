@@ -1,14 +1,14 @@
 //
 //  Mervyn Teo Zi Yan, A0273039A
 //
-// UI test: AdminDashboard (pages/admin/AdminDashboard.js) + AdminMenu (components/AdminMenu.js)
+// E2E tests: Admin dashboard flows spanning multiple components
 //
-// Tests cover:
-//  1. Admin dashboard renders the admin's name, email and phone from auth context
-//  2. AdminMenu panel heading is visible
-//  3. AdminMenu contains all five expected navigation links with correct hrefs
-//  4. Each AdminMenu link navigates to the correct route
-//  5. Non-admin / unauthenticated users cannot access the dashboard
+// Each test is a complete user journey:
+//  1. Admin navigates to dashboard → views info → navigates to Create Category page → sees category form
+//  2. Admin navigates to dashboard → clicks Products → sees product list → clicks a product
+//  3. Admin navigates to dashboard → clicks Orders → sees orders table
+//  4. Non-admin user tries to access admin dashboard → blocked/redirected
+//  5. Unauthenticated user tries to access admin dashboard → redirected to login → login → access dashboard
 //
 
 import { test, expect } from "@playwright/test";
@@ -19,112 +19,90 @@ const userAuthFile = path.join("playwright", ".user.auth.json");
 
 const DASHBOARD_ROUTE = "/dashboard/admin";
 
-// ── Admin suite ──────────────────────────────────────────────────────────────
-test.describe.serial("UI: AdminDashboard + AdminMenu (authorised admin)", () => {
+// ── Admin E2E flows ──────────────────────────────────────────────────────────
+test.describe("E2E: Admin dashboard workflows", () => {
   test.use({ storageState: adminAuthFile });
 
-  test("shows admin name, email, and contact from auth context", async ({ page }) => {
+  test("admin views dashboard info then navigates to Create Category page", async ({
+    page,
+  }) => {
+    // 1. Navigate to admin dashboard
     await page.goto(DASHBOARD_ROUTE);
 
-    // The cards display "Admin Name : <name>", "Admin Email : <email>", "Admin Contact : <phone>"
+    // 2. Verify admin details are displayed
     await expect(page.getByText(/admin name/i)).toBeVisible({ timeout: 5000 });
     await expect(page.getByText(/admin email/i)).toBeVisible();
     await expect(page.getByText(/admin contact/i)).toBeVisible();
-  });
 
-  test("AdminMenu heading 'Admin Panel' is visible", async ({ page }) => {
-    await page.goto(DASHBOARD_ROUTE);
+    // 3. Admin panel menu should be visible
+    await expect(page.getByRole("heading", { name: /admin panel/i })).toBeVisible();
 
-    await expect(
-      page.getByRole("heading", { name: /admin panel/i })
-    ).toBeVisible({ timeout: 5000 });
-  });
-
-  test("AdminMenu renders all five navigation links", async ({ page }) => {
-    await page.goto(DASHBOARD_ROUTE);
-
-    const menu = page.locator(".dashboard-menu");
-    await expect(menu).toBeVisible({ timeout: 5000 });
-
-    await expect(menu.getByRole("link", { name: /create category/i })).toBeVisible();
-    await expect(menu.getByRole("link", { name: /create product/i })).toBeVisible();
-    await expect(menu.getByRole("link", { name: /^products$/i })).toBeVisible();
-    await expect(menu.getByRole("link", { name: /^orders$/i })).toBeVisible();
-    await expect(menu.getByRole("link", { name: /^users$/i })).toBeVisible();
-  });
-
-  test("AdminMenu links have correct hrefs", async ({ page }) => {
-    await page.goto(DASHBOARD_ROUTE);
-
-    const menu = page.locator(".dashboard-menu");
-
-    await expect(menu.getByRole("link", { name: /create category/i })).toHaveAttribute(
-      "href",
-      "/dashboard/admin/create-category"
-    );
-    await expect(menu.getByRole("link", { name: /create product/i })).toHaveAttribute(
-      "href",
-      "/dashboard/admin/create-product"
-    );
-    await expect(menu.getByRole("link", { name: /^products$/i })).toHaveAttribute(
-      "href",
-      "/dashboard/admin/products"
-    );
-    await expect(menu.getByRole("link", { name: /^orders$/i })).toHaveAttribute(
-      "href",
-      "/dashboard/admin/orders"
-    );
-    await expect(menu.getByRole("link", { name: /^users$/i })).toHaveAttribute(
-      "href",
-      "/dashboard/admin/users"
-    );
-  });
-
-  test("clicking 'Create Category' navigates to the create-category page", async ({
-    page,
-  }) => {
-    await page.goto(DASHBOARD_ROUTE);
+    // 4. Click "Create Category" in the admin menu
     await page.locator(".dashboard-menu").getByRole("link", { name: /create category/i }).click();
+
+    // 5. Should navigate to create-category page and see the category form
     await page.waitForURL("**/dashboard/admin/create-category", { timeout: 5000 });
-    expect(page.url()).toContain("/dashboard/admin/create-category");
+    await expect(page.getByRole("heading", { name: /manage category/i })).toBeVisible({ timeout: 5000 });
   });
 
-  test("clicking 'Create Product' navigates to the create-product page", async ({
+  test("admin views dashboard then navigates to Products page and sees product list", async ({
     page,
   }) => {
+    // 1. Navigate to admin dashboard
     await page.goto(DASHBOARD_ROUTE);
-    await page.locator(".dashboard-menu").getByRole("link", { name: /create product/i }).click();
-    await page.waitForURL("**/dashboard/admin/create-product", { timeout: 5000 });
-    expect(page.url()).toContain("/dashboard/admin/create-product");
-  });
+    await expect(page.getByRole("heading", { name: /admin panel/i })).toBeVisible({ timeout: 5000 });
 
-  test("clicking 'Products' navigates to the products page", async ({ page }) => {
-    await page.goto(DASHBOARD_ROUTE);
+    // 2. Click "Products" in the admin menu
     await page.locator(".dashboard-menu").getByRole("link", { name: /^products$/i }).click();
+
+    // 3. Should navigate to products page
     await page.waitForURL("**/dashboard/admin/products", { timeout: 5000 });
-    expect(page.url()).toContain("/dashboard/admin/products");
+
+    // 4. Should see at least one product card (from seeded data)
+    await expect(page.getByRole("link", { name: /more details/i }).first()).toBeVisible({ timeout: 5000 });
   });
 
-  test("clicking 'Orders' navigates to the admin orders page", async ({ page }) => {
-    await page.goto(DASHBOARD_ROUTE);
-    await page.locator(".dashboard-menu").getByRole("link", { name: /^orders$/i }).click();
-    await page.waitForURL("**/dashboard/admin/orders", { timeout: 5000 });
-    expect(page.url()).toContain("/dashboard/admin/orders");
-  });
-
-  test("clicking 'Users' navigates to the users page", async ({ page }) => {
-    await page.goto(DASHBOARD_ROUTE);
-    await page.locator(".dashboard-menu").getByRole("link", { name: /^users$/i }).click();
-    await page.waitForURL("**/dashboard/admin/users", { timeout: 5000 });
-    expect(page.url()).toContain("/dashboard/admin/users");
-  });
-
-  test("dashboard card shows actual values from logged-in admin account", async ({
+  test("admin navigates from dashboard to Orders page and sees order list", async ({
     page,
   }) => {
+    // 1. Navigate to admin dashboard
+    await page.goto(DASHBOARD_ROUTE);
+    await expect(page.getByRole("heading", { name: /admin panel/i })).toBeVisible({ timeout: 5000 });
+
+    // 2. Click "Orders" in the admin menu
+    await page.locator(".dashboard-menu").getByRole("link", { name: /^orders$/i }).click();
+
+    // 3. Should navigate to orders page
+    await page.waitForURL("**/dashboard/admin/orders", { timeout: 5000 });
+
+    // 4. Should see the "All Orders" heading
+    await expect(page.getByRole("heading", { name: /all orders/i })).toBeVisible({ timeout: 5000 });
+  });
+
+  test("admin navigates from dashboard to Users page and sees user list", async ({
+    page,
+  }) => {
+    // 1. Navigate to admin dashboard
+    await page.goto(DASHBOARD_ROUTE);
+    await expect(page.getByRole("heading", { name: /admin panel/i })).toBeVisible({ timeout: 5000 });
+
+    // 2. Click "Users" in the admin menu
+    await page.locator(".dashboard-menu").getByRole("link", { name: /^users$/i }).click();
+
+    // 3. Should navigate to users page
+    await page.waitForURL("**/dashboard/admin/users", { timeout: 5000 });
+
+    // 4. Should see at least one user in the list (the test admin at minimum)
+    await expect(page.getByText(/test@admin.com/i)).toBeVisible({ timeout: 5000 });
+  });
+
+  test("admin dashboard card shows actual non-empty values from the logged-in admin", async ({
+    page,
+  }) => {
+    // 1. Navigate to admin dashboard
     await page.goto(DASHBOARD_ROUTE);
 
-    // Each <h3> renders "Admin Name : <value>" — assert a non-empty value follows the colon
+    // 2. Each <h3> renders "Admin Name : <value>" — assert a non-empty value follows the colon
     const nameHeading = page.locator(".card h3").nth(0);
     const emailHeading = page.locator(".card h3").nth(1);
     const phoneHeading = page.locator(".card h3").nth(2);
@@ -133,17 +111,35 @@ test.describe.serial("UI: AdminDashboard + AdminMenu (authorised admin)", () => 
     await expect(emailHeading).toHaveText(/Admin Email\s*:\s*\S+/);
     await expect(phoneHeading).toHaveText(/Admin Contact\s*:\s*\S+/);
   });
+
+  test("admin navigates dashboard → Create Product page → sees product form", async ({
+    page,
+  }) => {
+    // 1. Navigate to admin dashboard
+    await page.goto(DASHBOARD_ROUTE);
+    await expect(page.getByRole("heading", { name: /admin panel/i })).toBeVisible({ timeout: 5000 });
+
+    // 2. Click "Create Product" in the admin menu
+    await page.locator(".dashboard-menu").getByRole("link", { name: /create product/i }).click();
+
+    // 3. Should navigate to create-product page
+    await page.waitForURL("**/dashboard/admin/create-product", { timeout: 5000 });
+
+    // 4. Should see the create product form elements
+    await expect(page.getByText(/create product/i)).toBeVisible({ timeout: 5000 });
+  });
 });
 
-// ── Non-admin / unauthenticated suite ────────────────────────────────────────
-test.describe.serial("UI: AdminDashboard access control", () => {
-  test("non-admin user is blocked from the admin dashboard", async ({ browser }) => {
+// ── Access control flows ────────────────────────────────────────────────────
+test.describe("E2E: Admin dashboard access control", () => {
+  test("non-admin user cannot access admin dashboard and is blocked", async ({ browser }) => {
     const context = await browser.newContext({ storageState: userAuthFile });
     const page = await context.newPage();
 
+    // 1. Try to access admin dashboard as a regular user
     await page.goto(DASHBOARD_ROUTE);
 
-    // Allow spinner/redirect to resolve
+    // 2. Should be redirected away or not see admin content (spinner → redirect)
     await page.waitForTimeout(4500);
 
     const redirectedAway = !page.url().includes(DASHBOARD_ROUTE);
@@ -153,28 +149,37 @@ test.describe.serial("UI: AdminDashboard access control", () => {
       .catch(() => false);
 
     expect(redirectedAway || !panelVisible).toBeTruthy();
+
     await context.close();
   });
 
-  test("unauthenticated user is redirected away from admin dashboard", async ({
+  test("unauthenticated user is redirected from admin dashboard, then can login to access it", async ({
     browser,
   }) => {
-    // Explicitly clear storageState — browser.newContext() inherits the
-    // project-level storageState (admin auth) unless overridden here.
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
 
+    // 1. Try to visit admin dashboard without auth
     await page.goto(DASHBOARD_ROUTE);
 
-    // Spinner counts down ~3 s before redirect; use waitForURL so the test
-    // is robust regardless of page-load or JS-initialisation time.
+    // 2. Should be redirected away (spinner then redirect)
     await page
-      .waitForURL((url) => !url.toString().includes(DASHBOARD_ROUTE), {
-        timeout: 10000,
-      })
+      .waitForURL((url) => !url.toString().includes(DASHBOARD_ROUTE), { timeout: 10000 })
       .catch(() => {});
-
     expect(page.url()).not.toContain(DASHBOARD_ROUTE);
+
+    // 3. Navigate to login and authenticate
+    await page.goto("/login");
+    await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
+    await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
+    await page.getByRole("button", { name: /^login$/i }).click();
+    await page.waitForURL("/", { timeout: 5000 });
+
+    // 4. Now admin dashboard should be accessible
+    await page.goto(DASHBOARD_ROUTE);
+    await expect(page.getByText(/admin name/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("heading", { name: /admin panel/i })).toBeVisible();
+
     await context.close();
   });
 });

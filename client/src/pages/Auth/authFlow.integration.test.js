@@ -24,7 +24,7 @@ import { CartProvider } from "../../context/cart";
 import { SearchProvider } from "../../context/search";
 import Login from "../../pages/Auth/Login";
 import Register from "../../pages/Auth/Register";
-import AdminDashboard from "../../pages/Admin/AdminDashboard";
+import AdminDashboard from "../../pages/admin/AdminDashboard";
 
 jest.mock("axios");
 jest.mock("react-hot-toast");

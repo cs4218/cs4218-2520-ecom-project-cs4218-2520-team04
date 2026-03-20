@@ -1,182 +1,182 @@
 //
 //  Mervyn Teo Zi Yan, A0273039A
 //
-// UI test: Auth context (context/auth.js)
+// E2E tests: Auth context behaviour across multiple components
 //
-// Tests cover the runtime behaviour of AuthContext/AuthProvider:
-//  1. Auth state is restored from localStorage on page load (persistence across refresh)
-//  2. When localStorage has no auth entry the user is treated as unauthenticated
-//  3. Auth state is cleared from localStorage on logout (header link changes)
-//  4. Axios Authorization header is populated from the stored token
-//     (verified indirectly: protected API calls succeed when auth is in localStorage)
+// Each test is a complete user journey:
+//  1. Login → refresh page → auth persists → still see admin dashboard
+//  2. Login → logout → try to access admin dashboard → redirected away
+//  3. Auth token is sent with API requests (login → navigate to protected route → API receives token)
+//  4. Unauthenticated user visits protected route → spinner/redirect → lands on login → can login from there
+//  5. Login → localStorage has auth → navigate between pages → auth maintained
 //
 
 import { test, expect } from "@playwright/test";
 
-const FAKE_USER = {
-  name: "Context Test Admin",
-  email: "context@admin.com",
-  phone: "81234567",
-  role: 1,
-};
-const FAKE_TOKEN = "context-test-fake-token";
-
-// Each test uses browser.newContext() for full control over localStorage/auth state
-// rather than relying on the project-level storageState.
-
-test.describe.serial("UI: Auth context behaviour", () => {
-  test("auth state is restored from localStorage on page load", async ({ browser }) => {
-    const context = await browser.newContext(); // no storageState — clean slate
-
-    // Seed auth into localStorage before the page loads
-    await context.addInitScript(
-      ({ user, token }) => {
-        localStorage.setItem("auth", JSON.stringify({ user, token }));
-      },
-      { user: FAKE_USER, token: FAKE_TOKEN }
-    );
-
-    const page = await context.newPage();
-
-    // Stub admin-auth so the protected route renders instead of spinning/redirecting
-    await page.route("**/api/v1/auth/admin-auth", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true }),
-      });
-    });
-
-    await page.goto("/dashboard/admin");
-
-    // AdminDashboard renders user details from auth context.
-    // Scope to .card to avoid matching the nav-bar dropdown button that also
-    // shows the user name (strict-mode violation with getByText alone).
-    await expect(page.locator(".card").getByText(/context test admin/i)).toBeVisible({ timeout: 5000 });
-    await expect(page.locator(".card").getByText(/context@admin\.com/i)).toBeVisible({ timeout: 5000 });
-    await expect(page.locator(".card").getByText(/81234567/i)).toBeVisible({ timeout: 5000 });
-
-    await context.close();
-  });
-
-  test("unauthenticated user (no localStorage entry) is redirected away from protected route", async ({
+test.describe("E2E: Auth context persistence and protection", () => {
+  test("auth state persists across page refresh: login → refresh → still on admin dashboard", async ({
     browser,
   }) => {
-    // Explicitly clear storageState — browser.newContext() inherits the
-    // project-level storageState (admin auth) unless overridden here.
+    // Use a clean context (no storageState)
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
 
-    await page.goto("/dashboard/admin");
+    // 1. Login
+    await page.goto("/login");
+    await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
+    await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
+    await page.getByRole("button", { name: /^login$/i }).click();
+    await page.waitForURL("/", { timeout: 5000 });
 
-    // Spinner counts down ~3 s before redirecting to /login; use waitForURL
-    // so the test is robust regardless of page-load or JS-initialisation time.
+    // 2. Navigate to admin dashboard
+    await page.goto("/dashboard/admin");
+    await expect(page.getByText(/admin name/i)).toBeVisible({ timeout: 5000 });
+
+    // 3. Refresh the page
+    await page.reload();
+
+    // 4. Auth should persist — dashboard should still render (not redirect)
+    await expect(page.getByText(/admin name/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/admin email/i)).toBeVisible();
+
+    await context.close();
+  });
+
+  test("after logout, user cannot access admin dashboard and is redirected", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+
+    // 1. Login
+    await page.goto("/login");
+    await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
+    await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
+    await page.getByRole("button", { name: /^login$/i }).click();
+    await page.waitForURL("/", { timeout: 5000 });
+
+    // 2. Verify auth is stored
+    const authBefore = await page.evaluate(() => localStorage.getItem("auth"));
+    expect(authBefore).not.toBeNull();
+
+    // 3. Logout via nav dropdown
+    const userDropdown = page.locator(".nav-link.dropdown-toggle").first();
+    await expect(userDropdown).toBeVisible({ timeout: 5000 });
+    await userDropdown.click();
+    await page.getByRole("link", { name: /logout/i }).click();
+    await page.waitForURL("**/login", { timeout: 5000 });
+
+    // 4. Auth should be cleared from localStorage
+    const authAfter = await page.evaluate(() => localStorage.getItem("auth"));
+    expect(authAfter).toBeNull();
+
+    // 5. Try to visit admin dashboard — should not render admin content
+    await page.goto("/dashboard/admin");
     await page
-      .waitForURL((url) => !url.toString().includes("/dashboard/admin"), {
-        timeout: 10000,
-      })
+      .waitForURL((url) => !url.toString().includes("/dashboard/admin"), { timeout: 10000 })
       .catch(() => {});
 
-    expect(page.url()).not.toContain("/dashboard/admin");
-
-    await context.close();
-  });
-
-  test("auth state persists across a page refresh", async ({ browser }) => {
-    const context = await browser.newContext();
-
-    await context.addInitScript(
-      ({ user, token }) => {
-        localStorage.setItem("auth", JSON.stringify({ user, token }));
-      },
-      { user: FAKE_USER, token: FAKE_TOKEN }
-    );
-
-    const page = await context.newPage();
-
-    await page.route("**/api/v1/auth/admin-auth", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true }),
-      });
-    });
-
-    await page.goto("/dashboard/admin");
-    await expect(page.locator(".card").getByText(/context test admin/i)).toBeVisible({ timeout: 5000 });
-
-    // Reload — AuthProvider reads localStorage again on mount
-    await page.reload();
-    await expect(page.locator(".card").getByText(/context test admin/i)).toBeVisible({ timeout: 5000 });
-
-    await context.close();
-  });
-
-  test("after logout, auth entry is removed from localStorage", async ({ browser }) => {
-    const context = await browser.newContext();
-
-    await context.addInitScript(
-      ({ user, token }) => {
-        localStorage.setItem("auth", JSON.stringify({ user, token }));
-      },
-      { user: FAKE_USER, token: FAKE_TOKEN }
-    );
-
-    const page = await context.newPage();
-    await page.goto("/");
-
-    // Auth should be in localStorage before logout
-    const before = await page.evaluate(() => localStorage.getItem("auth"));
-    expect(before).not.toBeNull();
-
-    // Click the Logout nav link if visible
-    const logoutLink = page.getByRole("link", { name: /logout/i });
-    if (await logoutLink.isVisible()) {
-      await logoutLink.click();
-      await page.waitForTimeout(500);
-      const after = await page.evaluate(() => localStorage.getItem("auth"));
-      expect(after).toBeNull();
-    } else {
-      // Fallback: verify removing auth from localStorage works as expected
-      await page.evaluate(() => localStorage.removeItem("auth"));
-      const after = await page.evaluate(() => localStorage.getItem("auth"));
-      expect(after).toBeNull();
+    // Either redirected away or admin panel not visible
+    const isOnDashboard = page.url().includes("/dashboard/admin");
+    if (isOnDashboard) {
+      // If still on the URL, the admin content should not be rendered
+      await expect(page.getByRole("heading", { name: /admin panel/i })).not.toBeVisible();
     }
 
     await context.close();
   });
 
-  test("axios Authorization header is set from token stored in localStorage", async ({
+  test("unauthenticated user visiting protected route is redirected, then can login to access it", async ({
     browser,
   }) => {
-    const context = await browser.newContext();
-
-    await context.addInitScript(
-      ({ user, token }) => {
-        localStorage.setItem("auth", JSON.stringify({ user, token }));
-      },
-      { user: FAKE_USER, token: FAKE_TOKEN }
-    );
-
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
 
-    let capturedAuthHeader = null;
+    // 1. Try to visit admin dashboard without auth
+    await page.goto("/dashboard/admin");
 
-    // Intercept the admin-auth request and record the Authorization header
+    // 2. Should be redirected away (spinner shows then redirects to login)
+    await page
+      .waitForURL((url) => !url.toString().includes("/dashboard/admin"), { timeout: 10000 })
+      .catch(() => {});
+    expect(page.url()).not.toContain("/dashboard/admin");
+
+    // 3. Navigate to login
+    await page.goto("/login");
+    await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
+    await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
+    await page.getByRole("button", { name: /^login$/i }).click();
+    await page.waitForURL("/", { timeout: 5000 });
+
+    // 4. Now access admin dashboard — should work
+    await page.goto("/dashboard/admin");
+    await expect(page.getByText(/admin name/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("heading", { name: /admin panel/i })).toBeVisible();
+
+    await context.close();
+  });
+
+  test("axios Authorization header is set: admin API calls succeed after login", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+
+    // Capture the Authorization header on admin-auth API calls
+    let capturedAuthHeader = null;
     await page.route("**/api/v1/auth/admin-auth", async (route) => {
       capturedAuthHeader = route.request().headers()["authorization"];
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true }),
-      });
+      await route.continue();
     });
 
-    await page.goto("/dashboard/admin");
-    await page.waitForTimeout(2000);
+    // 1. Login
+    await page.goto("/login");
+    await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
+    await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
+    await page.getByRole("button", { name: /^login$/i }).click();
+    await page.waitForURL("/", { timeout: 5000 });
 
-    // axios.defaults.headers.common["Authorization"] is set from auth.token
-    expect(capturedAuthHeader).toBe(FAKE_TOKEN);
+    // 2. Navigate to admin dashboard — triggers admin-auth API call
+    await page.goto("/dashboard/admin");
+    await expect(page.getByText(/admin name/i)).toBeVisible({ timeout: 5000 });
+
+    // 3. Verify the Authorization header was sent with the token
+    expect(capturedAuthHeader).toBeTruthy();
+
+    await context.close();
+  });
+
+  test("auth is maintained while navigating between multiple pages", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+
+    // 1. Login
+    await page.goto("/login");
+    await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
+    await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
+    await page.getByRole("button", { name: /^login$/i }).click();
+    await page.waitForURL("/", { timeout: 5000 });
+
+    // 2. Navigate to home — should be authenticated
+    await expect(page.locator(".nav-link.dropdown-toggle").first()).toBeVisible({ timeout: 5000 });
+
+    // 3. Navigate to admin dashboard
+    await page.goto("/dashboard/admin");
+    await expect(page.getByText(/admin name/i)).toBeVisible({ timeout: 5000 });
+
+    // 4. Navigate back to home page
+    await page.getByRole("link", { name: /home/i }).click();
+    await page.waitForURL("/", { timeout: 5000 });
+
+    // 5. Still authenticated — user dropdown visible
+    await expect(page.locator(".nav-link.dropdown-toggle").first()).toBeVisible({ timeout: 5000 });
+
+    // 6. Navigate to cart page
+    await page.getByRole("link", { name: /cart/i }).click();
+    await page.waitForURL("**/cart", { timeout: 5000 });
+
+    // 7. Still authenticated
+    await expect(page.locator(".nav-link.dropdown-toggle").first()).toBeVisible({ timeout: 5000 });
 
     await context.close();
   });
