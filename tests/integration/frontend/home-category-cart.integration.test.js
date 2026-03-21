@@ -17,11 +17,12 @@
 import React from "react";
 import axios from "axios";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import toast from "react-hot-toast";
 
 import HomePage from "../../../client/src/pages/HomePage";
+import CartPage from "../../../client/src/pages/CartPage";
 import { AuthProvider } from "../../../client/src/context/auth";
 import { CartProvider, useCart } from "../../../client/src/context/cart";
 import { SearchProvider } from "../../../client/src/context/search";
@@ -29,6 +30,11 @@ import { SearchProvider } from "../../../client/src/context/search";
 var mockToastSuccess = jest.fn();
 
 jest.mock("axios");
+jest.mock(
+  "braintree-web-drop-in-react",
+  () => () => <div data-testid="dropin" />,
+  { virtual: true },
+);
 
 const CATEGORY_ID = "cat-electronics";
 const FILTER_URL = "/api/v1/product/product-filters";
@@ -88,6 +94,18 @@ const combinedFilteredProductsPageOne = [priceFilteredProducts[0]];
 const combinedFilteredProductsPageTwo = [priceFilteredProducts[1]];
 
 const pageTwoProducts = [priceFilteredProducts[1]];
+const electronicsCategory = categories[0];
+const booksCategory = categories[1];
+const mysteryPaperbackProduct = initialProducts[0];
+const studioMonitorProduct = initialProducts[1];
+const pocketDacProduct = categoryFilteredProducts[1];
+const portableChargerProduct = priceFilteredProducts[1];
+const allKnownProducts = [
+  mysteryPaperbackProduct,
+  studioMonitorProduct,
+  pocketDacProduct,
+  portableChargerProduct,
+];
 
 const buildFilterPayload = ({ checked = [], radio = [], page = 1 } = {}) => ({
   checked,
@@ -96,6 +114,8 @@ const buildFilterPayload = ({ checked = [], radio = [], page = 1 } = {}) => ({
 });
 
 const buildFilterKey = (payload) => JSON.stringify(buildFilterPayload(payload));
+const getProductNames = (products) => products.map((product) => product.name);
+const getCartPriceLabel = (product) => `Price : ${product.price}`;
 
 const defaultFilterResponses = {
   [buildFilterKey({ checked: [CATEGORY_ID] })]: categoryFilteredProducts,
@@ -121,6 +141,7 @@ const renderHomePage = () =>
             <CartStateProbe />
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/cart" element={<CartPage />} />
               <Route path="/product/:slug" element={<div>Product details</div>} />
             </Routes>
           </SearchProvider>
@@ -145,6 +166,10 @@ const setupHttpMocks = ({
       case "/api/v1/category/get-category":
         return Promise.resolve({
           data: { success: true, category: categories },
+        });
+      case "/api/v1/product/braintree/token":
+        return Promise.resolve({
+          data: { clientToken: "test-client-token" },
         });
       case "/api/v1/product/product-count":
         return Promise.resolve({
@@ -189,10 +214,12 @@ const waitForInitialHomeLoad = async () => {
     expect(axios.get).toHaveBeenCalledWith("/api/v1/category/get-category");
     expect(axios.get).toHaveBeenCalledWith("/api/v1/product/product-count");
     expect(axios.get).toHaveBeenCalledWith("/api/v1/product/product-list/1");
-    expect(screen.getByRole("checkbox", { name: "Electronics" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Books" })).toBeInTheDocument();
-    expect(screen.getByText("Mystery Paperback")).toBeInTheDocument();
-    expect(screen.getByText("Studio Monitor")).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: electronicsCategory.name }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: booksCategory.name })).toBeInTheDocument();
+    expect(screen.getByText(mysteryPaperbackProduct.name)).toBeInTheDocument();
+    expect(screen.getByText(studioMonitorProduct.name)).toBeInTheDocument();
   });
 };
 
@@ -205,6 +232,16 @@ const expectVisibleProducts = async (visibleProducts, hiddenProducts = []) => {
     hiddenProducts.forEach((productName) => {
       expect(screen.queryByText(productName)).not.toBeInTheDocument();
     });
+  });
+};
+
+const getAddToCartButtonForProduct = (productName) => {
+  const productCard = screen.getByText(productName).closest(".card");
+
+  expect(productCard).not.toBeNull();
+
+  return within(productCard).getByRole("button", {
+    name: /add to cart/i,
   });
 };
 
@@ -235,7 +272,7 @@ describe("[Integration] Home shopper flows", () => {
       // Arrange
       await waitForInitialHomeLoad();
       const electronicsCheckbox = screen.getByRole("checkbox", {
-        name: "Electronics",
+        name: electronicsCategory.name,
       });
 
       // Act
@@ -251,8 +288,8 @@ describe("[Integration] Home shopper flows", () => {
       });
 
       await expectVisibleProducts(
-        ["Studio Monitor", "Pocket DAC"],
-        ["Mystery Paperback"],
+        getProductNames(categoryFilteredProducts),
+        getProductNames([mysteryPaperbackProduct]),
       );
     });
 
@@ -278,8 +315,8 @@ describe("[Integration] Home shopper flows", () => {
       });
 
       await expectVisibleProducts(
-        ["Pocket DAC", "Portable Charger"],
-        ["Mystery Paperback", "Studio Monitor"],
+        getProductNames(priceFilteredProducts),
+        getProductNames(initialProducts),
       );
     });
 
@@ -289,7 +326,7 @@ describe("[Integration] Home shopper flows", () => {
       // Arrange
       await waitForInitialHomeLoad();
       const electronicsCheckbox = screen.getByRole("checkbox", {
-        name: "Electronics",
+        name: electronicsCategory.name,
       });
       const priceRadio = screen.getByRole("radio", {
         name: "$20 to 39",
@@ -309,8 +346,12 @@ describe("[Integration] Home shopper flows", () => {
       });
 
       await expectVisibleProducts(
-        ["Pocket DAC"],
-        ["Mystery Paperback", "Studio Monitor", "Portable Charger"],
+        getProductNames(combinedFilteredProductsPageOne),
+        getProductNames([
+          mysteryPaperbackProduct,
+          studioMonitorProduct,
+          portableChargerProduct,
+        ]),
       );
     });
 
@@ -320,7 +361,7 @@ describe("[Integration] Home shopper flows", () => {
       // Arrange
       await waitForInitialHomeLoad();
       const electronicsCheckbox = screen.getByRole("checkbox", {
-        name: "Electronics",
+        name: electronicsCategory.name,
       });
 
       // Act
@@ -328,8 +369,8 @@ describe("[Integration] Home shopper flows", () => {
 
       // Assert
       await expectVisibleProducts(
-        ["Studio Monitor", "Pocket DAC"],
-        ["Mystery Paperback"],
+        getProductNames(categoryFilteredProducts),
+        getProductNames([mysteryPaperbackProduct]),
       );
 
       // Act
@@ -341,8 +382,8 @@ describe("[Integration] Home shopper flows", () => {
       });
 
       await expectVisibleProducts(
-        ["Mystery Paperback", "Studio Monitor"],
-        ["Pocket DAC"],
+        getProductNames(initialProducts),
+        getProductNames([pocketDacProduct]),
       );
     });
 
@@ -351,9 +392,9 @@ describe("[Integration] Home shopper flows", () => {
 
       // Arrange
       await waitForInitialHomeLoad();
-      const addToCartButton = screen.getAllByRole("button", {
-        name: /add to cart/i,
-      })[0];
+      const addToCartButton = getAddToCartButtonForProduct(
+        mysteryPaperbackProduct.name,
+      );
 
       // Act
       await userEvent.click(addToCartButton);
@@ -368,12 +409,37 @@ describe("[Integration] Home shopper flows", () => {
         expect(JSON.parse(localStorage.getItem("cart"))).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
-              _id: "prod-book",
-              name: "Mystery Paperback",
+              _id: mysteryPaperbackProduct._id,
+              name: mysteryPaperbackProduct.name,
             }),
           ]),
         );
         expect(mockToastSuccess).toHaveBeenCalledWith("Item Added to cart");
+      });
+    });
+
+    it("opens the cart page from the header and shows the correct cart item", async () => {
+      setupHttpMocks();
+
+      // Arrange
+      await waitForInitialHomeLoad();
+      const addToCartButton = getAddToCartButtonForProduct(
+        mysteryPaperbackProduct.name,
+      );
+
+      // Act
+      await userEvent.click(addToCartButton);
+      await userEvent.click(screen.getByRole("link", { name: /cart/i }));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: /cart summary/i })).toBeInTheDocument();
+        expect(screen.getByText(mysteryPaperbackProduct.name)).toBeInTheDocument();
+        expect(
+          screen.getByText(getCartPriceLabel(mysteryPaperbackProduct)),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/You Have 1 items in your cart/i)).toBeInTheDocument();
+        expect(screen.queryByText(studioMonitorProduct.name)).not.toBeInTheDocument();
       });
     });
 
@@ -393,9 +459,8 @@ describe("[Integration] Home shopper flows", () => {
       });
 
       await expectVisibleProducts([
-        "Mystery Paperback",
-        "Studio Monitor",
-        "Portable Charger",
+        ...getProductNames(initialProducts),
+        portableChargerProduct.name,
       ]);
     });
 
@@ -405,7 +470,7 @@ describe("[Integration] Home shopper flows", () => {
       // Arrange
       await waitForInitialHomeLoad();
       const electronicsCheckbox = screen.getByRole("checkbox", {
-        name: "Electronics",
+        name: electronicsCategory.name,
       });
       const priceRadio = screen.getByRole("radio", {
         name: "$20 to 39",
@@ -433,8 +498,11 @@ describe("[Integration] Home shopper flows", () => {
       });
 
       await expectVisibleProducts(
-        ["Pocket DAC", "Portable Charger"],
-        ["Mystery Paperback", "Studio Monitor"],
+        getProductNames([
+          ...combinedFilteredProductsPageOne,
+          ...combinedFilteredProductsPageTwo,
+        ]),
+        getProductNames(initialProducts),
       );
     });
   });
@@ -450,7 +518,7 @@ describe("[Integration] Home shopper flows", () => {
       // Arrange
       await waitForInitialHomeLoad();
       const electronicsCheckbox = screen.getByRole("checkbox", {
-        name: "Electronics",
+        name: electronicsCategory.name,
       });
       const priceRadio = screen.getByRole("radio", {
         name: "$20 to 39",
@@ -472,8 +540,12 @@ describe("[Integration] Home shopper flows", () => {
         ).not.toBeInTheDocument();
       });
 
+      await expectVisibleProducts([], getProductNames(allKnownProducts));
+
       expect(screen.getByRole("heading", { name: /all products/i })).toBeInTheDocument();
-      expect(screen.getByRole("checkbox", { name: "Electronics" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: electronicsCategory.name }),
+      ).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: "$20 to 39" })).toBeInTheDocument();
     });
   });

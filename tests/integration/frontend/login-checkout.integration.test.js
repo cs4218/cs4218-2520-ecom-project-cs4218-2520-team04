@@ -87,8 +87,6 @@ const renderLoginCheckoutFlow = () =>
 
 describe("[Integration] Guest checkout login redirect", () => {
   beforeAll(() => {
-    jest.spyOn(console, "error").mockImplementation(() => {});
-    jest.spyOn(console, "warn").mockImplementation(() => {});
     jest.spyOn(console, "log").mockImplementation(() => {});
   });
 
@@ -186,6 +184,10 @@ describe("[Integration] Guest checkout login redirect", () => {
       expect(localStorage.getItem("auth")).toContain("token-123");
       expect(axios.defaults.headers.common["Authorization"]).toBe("token-123");
       expect(screen.getByText(/Hello\s+Checkout User/)).toBeInTheDocument();
+      expect(screen.getByText(/You Have 1 items in your cart/i)).toBeInTheDocument();
+      expect(screen.getByText("Checkout Keyboard")).toBeInTheDocument();
+      expect(screen.getByText(/Total : \$129\.00/i)).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("cart"))).toEqual([CART_ITEM]);
       expect(screen.getByText("123 Payment Street")).toBeInTheDocument();
       expect(screen.getByTestId("dropin")).toBeInTheDocument();
       expect(
