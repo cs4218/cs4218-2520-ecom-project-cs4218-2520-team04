@@ -126,20 +126,18 @@ const defaultFilterResponses = {
     products: priceFilteredProducts,
     total: priceFilteredProducts.length,
   },
-  [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE })]:
-    {
-      products: combinedFilteredProductsPageOne,
-      total:
-        combinedFilteredProductsPageOne.length +
-        combinedFilteredProductsPageTwo.length,
-    },
-  [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE, page: 2 })]:
-    {
-      products: combinedFilteredProductsPageTwo,
-      total:
-        combinedFilteredProductsPageOne.length +
-        combinedFilteredProductsPageTwo.length,
-    },
+  [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE })]: {
+    products: combinedFilteredProductsPageOne,
+    total:
+      combinedFilteredProductsPageOne.length +
+      combinedFilteredProductsPageTwo.length,
+  },
+  [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE, page: 2 })]: {
+    products: combinedFilteredProductsPageTwo,
+    total:
+      combinedFilteredProductsPageOne.length +
+      combinedFilteredProductsPageTwo.length,
+  },
 };
 
 const CartStateProbe = () => {
@@ -158,7 +156,10 @@ const renderHomePage = () =>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/cart" element={<CartPage />} />
-              <Route path="/product/:slug" element={<div>Product details</div>} />
+              <Route
+                path="/product/:slug"
+                element={<div>Product details</div>}
+              />
             </Routes>
           </SearchProvider>
         </CartProvider>
@@ -233,7 +234,9 @@ const waitForInitialHomeLoad = async () => {
     expect(
       screen.getByRole("checkbox", { name: electronicsCategory.name }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: booksCategory.name })).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: booksCategory.name }),
+    ).toBeInTheDocument();
     expect(screen.getByText(mysteryPaperbackProduct.name)).toBeInTheDocument();
     expect(screen.getByText(studioMonitorProduct.name)).toBeInTheDocument();
   });
@@ -247,6 +250,14 @@ const expectVisibleProducts = async (visibleProducts, hiddenProducts = []) => {
 
     hiddenProducts.forEach((productName) => {
       expect(screen.queryByText(productName)).not.toBeInTheDocument();
+    });
+  });
+};
+
+const expectNoDuplicateProducts = async (productNames) => {
+  await waitFor(() => {
+    productNames.forEach((productName) => {
+      expect(screen.getAllByText(productName)).toHaveLength(1);
     });
   });
 };
@@ -394,7 +405,9 @@ describe("[Integration] Home shopper flows", () => {
 
       // Assert
       await waitFor(() => {
-        expect(axios.get).toHaveBeenLastCalledWith("/api/v1/product/product-list/1");
+        expect(axios.get).toHaveBeenLastCalledWith(
+          "/api/v1/product/product-list/1",
+        );
       });
 
       await expectVisibleProducts(
@@ -449,13 +462,21 @@ describe("[Integration] Home shopper flows", () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByRole("heading", { name: /cart summary/i })).toBeInTheDocument();
-        expect(screen.getByText(mysteryPaperbackProduct.name)).toBeInTheDocument();
+        expect(
+          screen.getByRole("heading", { name: /cart summary/i }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(mysteryPaperbackProduct.name),
+        ).toBeInTheDocument();
         expect(
           screen.getByText(getCartPriceLabel(mysteryPaperbackProduct)),
         ).toBeInTheDocument();
-        expect(screen.getByText(/You Have 1 items in your cart/i)).toBeInTheDocument();
-        expect(screen.queryByText(studioMonitorProduct.name)).not.toBeInTheDocument();
+        expect(
+          screen.getByText(/You Have 1 items in your cart/i),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText(studioMonitorProduct.name),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -471,10 +492,17 @@ describe("[Integration] Home shopper flows", () => {
 
       // Assert
       await waitFor(() => {
-        expect(axios.get).toHaveBeenCalledWith("/api/v1/product/product-list/2");
+        expect(axios.get).toHaveBeenCalledWith(
+          "/api/v1/product/product-list/2",
+        );
       });
 
       await expectVisibleProducts([
+        ...getProductNames(initialProducts),
+        portableChargerProduct.name,
+      ]);
+      // Check for duplicate products as well
+      await expectNoDuplicateProducts([
         ...getProductNames(initialProducts),
         portableChargerProduct.name,
       ]);
@@ -520,6 +548,12 @@ describe("[Integration] Home shopper flows", () => {
         ]),
         getProductNames(initialProducts),
       );
+      await expectNoDuplicateProducts(
+        getProductNames([
+          ...combinedFilteredProductsPageOne,
+          ...combinedFilteredProductsPageTwo,
+        ]),
+      );
     });
   });
 
@@ -561,11 +595,15 @@ describe("[Integration] Home shopper flows", () => {
 
       await expectVisibleProducts([], getProductNames(allKnownProducts));
 
-      expect(screen.getByRole("heading", { name: /all products/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /all products/i }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole("checkbox", { name: electronicsCategory.name }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("radio", { name: "$20 to 39" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: "$20 to 39" }),
+      ).toBeInTheDocument();
     });
   });
 });
