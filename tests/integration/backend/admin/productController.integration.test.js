@@ -23,17 +23,41 @@ import userModel from "../../../../models/userModel.js";
 // Use a fixed test secret so auth middleware and token signing agree
 process.env.JWT_SECRET = "test-jwt-secret-integration";
 
+const mockBraintreeGateway = {
+  clientToken: { generate: jest.fn() },
+  transaction: { sale: jest.fn() },
+};
+
 // Suppress console.log from middleware (expected JWT errors in auth tests)
-beforeEach(() => jest.spyOn(console, "log").mockImplementation(() => {}));
+beforeEach(() => {
+  jest.spyOn(console, "log").mockImplementation(() => {});
+  mockBraintreeGateway.clientToken.generate.mockReset();
+  mockBraintreeGateway.transaction.sale.mockReset();
+});
 
 // Mock only braintree (external payment gateway - not under test)
 jest.mock("braintree", () => ({
-  BraintreeGateway: jest.fn().mockImplementation(() => ({})),
+  BraintreeGateway: jest.fn().mockImplementation(() => mockBraintreeGateway),
   Environment: { Sandbox: "sandbox" },
+  __mockGateway: mockBraintreeGateway,
 }));
 
 // Minimal JPEG bytes for photo upload tests
 const TEST_PHOTO_BUFFER = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+
+const waitForOrderByBuyer = async (buyerId, timeoutMs = 1000) => {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const order = await orderModel.findOne({ buyer: buyerId });
+    if (order) {
+      return order;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  return orderModel.findOne({ buyer: buyerId });
+};
 
 let mongod;
 let app;
@@ -85,54 +109,376 @@ describe("Auth middleware - protected product routes", () => {
 
   test("DELETE /delete-product/:pid returns 401 with no Authorization header", async () => {
     const fakeId = new mongoose.Types.ObjectId();
-    const res = await request(app)
-      .delete(`/api/v1/product/delete-product/${fakeId}`);
+    const res = await request(app).delete(
+      `/api/v1/product/delete-product/${fakeId}`,
+    );
 
     expect(res.status).toBe(401);
   });
 });
 
 // Teo Kai Xiang, A0272558U
-// Written by GPT 5.4 based on test plans written by me. Reviewed after
-describe("Negative path cases - protected payment route", () => {
-  test("POST /braintree/payment rejects an unauthenticated request and does not persist an order", async () => {
-    // Arrange
-    const category = await categoryModel.create({
-      name: "Electronics",
-      slug: "electronics",
-    });
-    const product = await productModel.create({
-      name: "Laptop",
-      slug: "laptop",
-      description: "A fast laptop",
-      price: 999,
-      category: category._id,
-      quantity: 3,
-    });
-    const orderCountBeforeRequest = await orderModel.countDocuments({});
+describe("GET /api/v1/product/braintree/token", () => {
+  describe("failure path", () => {
+    test("rejects an unauthenticated request", async () => {
+      // Arrange
 
-    // Act
-    const res = await request(app)
-      .post("/api/v1/product/braintree/payment")
-      .send({
-        nonce: "fake-valid-nonce",
-        cart: [
-          {
-            _id: product._id.toString(),
-            name: product.name,
-            price: product.price,
-            quantity: 1,
-          },
-        ],
+      // Act
+      const res = await request(app).get("/api/v1/product/braintree/token");
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    });
+
+    describe("authenticated request where the gateway returns an error", () => {
+      let shopper;
+      let shopperToken;
+
+      beforeAll(async () => {
+        shopper = await userModel.create({
+          name: "Token Failure Shopper",
+          email: "token-failure-shopper@test.com",
+          password: "pass123",
+          phone: "80000002",
+          address: "2 Token Street",
+          answer: "token-failure-answer",
+          role: 0,
+        });
+        shopperToken = jwt.sign({ _id: shopper._id }, process.env.JWT_SECRET, {
+          expiresIn: "1h",
+        });
       });
 
-    // Assert
-    expect(res.status).toBe(401);
-    expect(res.body).toEqual({
-      success: false,
-      message: "Invalid or expired token",
+      afterAll(async () => {
+        await userModel.deleteOne({ email: "token-failure-shopper@test.com" });
+      });
+
+      test("returns 500 when Braintree client token generation fails for an authenticated user", async () => {
+        // Arrange
+        const errorResponse = { message: "token generation failed" };
+        mockBraintreeGateway.clientToken.generate.mockImplementationOnce(
+          (payload, callback) => callback(errorResponse, null),
+        );
+
+        // Act
+        const res = await request(app)
+          .get("/api/v1/product/braintree/token")
+          .set("Authorization", shopperToken);
+
+        // Assert
+        expect(res.status).toBe(500);
+        expect(res.body).toEqual(errorResponse);
+      });
     });
-    expect(await orderModel.countDocuments({})).toBe(orderCountBeforeRequest);
+  });
+
+  describe("success path", () => {
+    describe("authenticated request where the gateway returns a token", () => {
+      let shopper;
+      let shopperToken;
+
+      beforeAll(async () => {
+        shopper = await userModel.create({
+          name: "Token Shopper",
+          email: "token-shopper@test.com",
+          password: "pass123",
+          phone: "80000001",
+          address: "1 Token Street",
+          answer: "token-answer",
+          role: 0,
+        });
+        shopperToken = jwt.sign({ _id: shopper._id }, process.env.JWT_SECRET, {
+          expiresIn: "1h",
+        });
+      });
+
+      afterAll(async () => {
+        await userModel.deleteOne({ email: "token-shopper@test.com" });
+      });
+
+      test("forwards the generated client token response as-is", async () => {
+        // Arrange
+        const responseObj = { clientToken: "token-123" };
+        mockBraintreeGateway.clientToken.generate.mockImplementationOnce(
+          (payload, callback) => callback(null, responseObj),
+        );
+
+        // Act
+        const res = await request(app)
+          .get("/api/v1/product/braintree/token")
+          .set("Authorization", shopperToken);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(responseObj);
+        expect(mockBraintreeGateway.clientToken.generate).toHaveBeenCalledWith(
+          {},
+          expect.any(Function),
+        );
+      });
+    });
+  });
+});
+
+describe("POST /api/v1/product/braintree/payment", () => {
+  describe("failure path", () => {
+    test("rejects an unauthenticated request and does not persist an order", async () => {
+      // Arrange
+      const category = await categoryModel.create({
+        name: "Electronics",
+        slug: "electronics",
+      });
+      const product = await productModel.create({
+        name: "Laptop",
+        slug: "laptop",
+        description: "A fast laptop",
+        price: 999,
+        category: category._id,
+        quantity: 3,
+      });
+      const orderCountBeforeRequest = await orderModel.countDocuments({});
+
+      // Act
+      const res = await request(app)
+        .post("/api/v1/product/braintree/payment")
+        .send({
+          nonce: "fake-valid-nonce",
+          cart: [
+            {
+              _id: product._id.toString(),
+              name: product.name,
+              price: product.price,
+              quantity: 1,
+            },
+          ],
+        });
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({
+        success: false,
+        message: "Invalid or expired token",
+      });
+      expect(await orderModel.countDocuments({})).toBe(orderCountBeforeRequest);
+    });
+
+    describe("authenticated request where the gateway returns an error", () => {
+      let shopper;
+      let shopperToken;
+      let product;
+
+      beforeAll(async () => {
+        shopper = await userModel.create({
+          name: "Payment Failure Shopper",
+          email: "payment-failure-shopper@test.com",
+          password: "pass123",
+          phone: "80000004",
+          address: "4 Payment Street",
+          answer: "payment-failure-answer",
+          role: 0,
+        });
+        shopperToken = jwt.sign({ _id: shopper._id }, process.env.JWT_SECRET, {
+          expiresIn: "1h",
+        });
+      });
+
+      afterAll(async () => {
+        await userModel.deleteOne({
+          email: "payment-failure-shopper@test.com",
+        });
+      });
+
+      beforeEach(async () => {
+        const category = await categoryModel.create({
+          name: "Checkout Failure",
+          slug: "checkout-failure",
+        });
+        product = await productModel.create({
+          name: "Keyboard",
+          slug: "keyboard",
+          description: "A mechanical keyboard",
+          price: 80,
+          category: category._id,
+          quantity: 7,
+        });
+      });
+
+      test("returns 500 and does not persist an order when Braintree sale fails", async () => {
+        // Arrange
+        const errorResponse = { message: "payment failed" };
+        const orderCountBeforeRequest = await orderModel.countDocuments({});
+        mockBraintreeGateway.transaction.sale.mockImplementationOnce(
+          (payload, callback) => callback(errorResponse, null),
+        );
+
+        // Act
+        const res = await request(app)
+          .post("/api/v1/product/braintree/payment")
+          .set("Authorization", shopperToken)
+          .send({
+            nonce: "nonce-fail",
+            cart: [{ _id: product._id.toString(), price: product.price }],
+          });
+
+        // Assert
+        expect(res.status).toBe(500);
+        expect(res.body).toEqual(errorResponse);
+        expect(await orderModel.countDocuments({})).toBe(
+          orderCountBeforeRequest,
+        );
+      });
+    });
+  });
+
+  describe("success path", () => {
+    describe("authenticated request where the gateway approves the payment", () => {
+      let shopper;
+      let shopperToken;
+      let firstProduct;
+      let secondProduct;
+
+      beforeAll(async () => {
+        shopper = await userModel.create({
+          name: "Payment Shopper",
+          email: "payment-shopper@test.com",
+          password: "pass123",
+          phone: "80000003",
+          address: "3 Payment Street",
+          answer: "payment-answer",
+          role: 0,
+        });
+        shopperToken = jwt.sign({ _id: shopper._id }, process.env.JWT_SECRET, {
+          expiresIn: "1h",
+        });
+      });
+
+      afterAll(async () => {
+        await userModel.deleteOne({ email: "payment-shopper@test.com" });
+      });
+
+      beforeEach(async () => {
+        const category = await categoryModel.create({
+          name: "Checkout",
+          slug: "checkout",
+        });
+        [firstProduct, secondProduct] = await productModel.create([
+          {
+            name: "Laptop",
+            slug: "laptop",
+            description: "A fast laptop",
+            price: 10,
+            category: category._id,
+            quantity: 3,
+          },
+          {
+            name: "Mouse",
+            slug: "mouse",
+            description: "A wireless mouse",
+            price: 15,
+            category: category._id,
+            quantity: 5,
+          },
+        ]);
+      });
+
+      test("returns ok true and persists an order with products, payment, and buyer", async () => {
+        // Arrange
+        const cart = [
+          { _id: firstProduct._id.toString(), price: firstProduct.price },
+          { _id: secondProduct._id.toString(), price: secondProduct.price },
+        ];
+        const resultObj = { transaction: { id: "txn-1", status: "submitted" } };
+        mockBraintreeGateway.transaction.sale.mockImplementationOnce(
+          (payload, callback) => callback(null, resultObj),
+        );
+
+        // Act
+        const res = await request(app)
+          .post("/api/v1/product/braintree/payment")
+          .set("Authorization", shopperToken)
+          .send({
+            nonce: "nonce-123",
+            cart,
+          });
+        const savedOrder = await waitForOrderByBuyer(shopper._id);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ ok: true });
+        expect(savedOrder).not.toBeNull();
+        expect(
+          savedOrder.products.map((productId) => productId.toString()),
+        ).toEqual([firstProduct._id.toString(), secondProduct._id.toString()]);
+        expect(savedOrder.payment).toEqual(resultObj);
+        expect(savedOrder.buyer.toString()).toBe(shopper._id.toString());
+      });
+    });
+
+    describe("authenticated request amount calculation", () => {
+      let shopper;
+      let shopperToken;
+      let firstProduct;
+      let secondProduct;
+      let thirdProduct;
+
+      beforeAll(async () => {
+        shopper = await userModel.create({
+          name: "Amount Shopper",
+          email: "amount-shopper@test.com",
+          password: "pass123",
+          phone: "80000005",
+          address: "5 Payment Street",
+          answer: "amount-answer",
+          role: 0,
+        });
+        shopperToken = jwt.sign({ _id: shopper._id }, process.env.JWT_SECRET, {
+          expiresIn: "1h",
+        });
+      });
+
+      afterAll(async () => {
+        await userModel.deleteOne({ email: "amount-shopper@test.com" });
+      });
+
+      beforeEach(async () => {
+        const category = await categoryModel.create({
+          name: "Checkout Amount",
+          slug: "checkout-amount",
+        });
+        [firstProduct, secondProduct, thirdProduct] = await productModel.create(
+          [
+            {
+              name: "Tablet",
+              slug: "tablet",
+              description: "A tablet",
+              price: 29.99,
+              category: category._id,
+              quantity: 2,
+            },
+            {
+              name: "Monitor",
+              slug: "monitor",
+              description: "A monitor",
+              price: 50,
+              category: category._id,
+              quantity: 1,
+            },
+            {
+              name: "Cable",
+              slug: "cable",
+              description: "A cable",
+              price: 20.01,
+              category: category._id,
+              quantity: 8,
+            },
+          ],
+        );
+      });
+    });
   });
 });
 
@@ -153,7 +499,9 @@ describe("Product CRUD - admin authenticated requests via full HTTP stack", () =
       answer: "answer",
       role: 1,
     });
-    adminToken = jwt.sign({ _id: admin._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    adminToken = jwt.sign({ _id: admin._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
   });
 
   afterAll(async () => {
@@ -161,7 +509,10 @@ describe("Product CRUD - admin authenticated requests via full HTTP stack", () =
   });
 
   beforeEach(async () => {
-    testCategory = await categoryModel.create({ name: "Electronics", slug: "electronics" });
+    testCategory = await categoryModel.create({
+      name: "Electronics",
+      slug: "electronics",
+    });
   });
 
   describe("POST /api/v1/product/create-product", () => {
@@ -175,7 +526,10 @@ describe("Product CRUD - admin authenticated requests via full HTTP stack", () =
         .field("category", testCategory._id.toString())
         .field("quantity", "3")
         .field("shipping", "1")
-        .attach("photo", TEST_PHOTO_BUFFER, { filename: "photo.jpg", contentType: "image/jpeg" });
+        .attach("photo", TEST_PHOTO_BUFFER, {
+          filename: "photo.jpg",
+          contentType: "image/jpeg",
+        });
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -199,7 +553,10 @@ describe("Product CRUD - admin authenticated requests via full HTTP stack", () =
         .field("price", "10")
         .field("category", fakeId.toString())
         .field("quantity", "5")
-        .attach("photo", TEST_PHOTO_BUFFER, { filename: "photo.jpg", contentType: "image/jpeg" });
+        .attach("photo", TEST_PHOTO_BUFFER, {
+          filename: "photo.jpg",
+          contentType: "image/jpeg",
+        });
 
       expect(res.status).toBe(404);
       expect(res.body.message).toBe("Category not found");
@@ -216,7 +573,10 @@ describe("Product CRUD - admin authenticated requests via full HTTP stack", () =
         .field("price", "5")
         .field("category", testCategory._id.toString())
         .field("quantity", "1")
-        .attach("photo", TEST_PHOTO_BUFFER, { filename: "photo.jpg", contentType: "image/jpeg" });
+        .attach("photo", TEST_PHOTO_BUFFER, {
+          filename: "photo.jpg",
+          contentType: "image/jpeg",
+        });
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe("Name is Required");
@@ -338,7 +698,11 @@ describe("Product CRUD - admin authenticated requests via full HTTP stack", () =
         answer: "ans",
         role: 0,
       });
-      const nonAdminToken = jwt.sign({ _id: nonAdmin._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+      const nonAdminToken = jwt.sign(
+        { _id: nonAdmin._id },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" },
+      );
       const product = await productModel.create({
         name: "Camera",
         slug: "camera",
@@ -378,7 +742,9 @@ describe("Product CRUD - admin authenticated requests via full HTTP stack", () =
         .set("Authorization", adminToken);
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toBe("Cannot delete product associated with orders");
+      expect(res.body.message).toBe(
+        "Cannot delete product associated with orders",
+      );
 
       // Product must still exist
       expect(await productModel.findById(product._id)).not.toBeNull();
@@ -445,7 +811,9 @@ describe("Full product lifecycle via HTTP stack - create -> update -> delete", (
       answer: "ans",
       role: 1,
     });
-    adminToken = jwt.sign({ _id: admin._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    adminToken = jwt.sign({ _id: admin._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
   });
 
   afterAll(async () => {
@@ -453,7 +821,10 @@ describe("Full product lifecycle via HTTP stack - create -> update -> delete", (
   });
 
   beforeEach(async () => {
-    category = await categoryModel.create({ name: "Clothing", slug: "clothing" });
+    category = await categoryModel.create({
+      name: "Clothing",
+      slug: "clothing",
+    });
   });
 
   test("create -> update -> delete through full HTTP + middleware + DB", async () => {
@@ -466,13 +837,18 @@ describe("Full product lifecycle via HTTP stack - create -> update -> delete", (
       .field("price", "19")
       .field("category", category._id.toString())
       .field("quantity", "20")
-      .attach("photo", TEST_PHOTO_BUFFER, { filename: "photo.jpg", contentType: "image/jpeg" });
+      .attach("photo", TEST_PHOTO_BUFFER, {
+        filename: "photo.jpg",
+        contentType: "image/jpeg",
+      });
     expect(createRes.status).toBe(201);
     const productId = createRes.body.products._id;
 
     // Step 2: Verify in public GET list
     const listRes = await request(app).get("/api/v1/product/get-product");
-    expect(listRes.body.products.find((p) => p._id === productId)).toBeDefined();
+    expect(
+      listRes.body.products.find((p) => p._id === productId),
+    ).toBeDefined();
 
     // Step 3: Update name
     const updateRes = await request(app)
