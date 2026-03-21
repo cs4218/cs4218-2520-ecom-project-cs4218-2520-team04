@@ -91,4 +91,5 @@ describe('AdminMenu Component', () => {
         expect(usersLink).toBeInTheDocument();
         expect(usersLink.closest('a')).toHaveAttribute('href', '/dashboard/admin/users');
     });
+
 });
