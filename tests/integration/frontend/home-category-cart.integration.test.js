@@ -1,6 +1,6 @@
 // A0272558U Teo Kai Xiang
 // Written by GPT 5.4 based on test plans written by me. Reviewed after
-// Integration Between: Home <-> Category <-> Cart
+// Integration Between: Home <-> Category <-> Cart <-> Header
 // ============= Full list of tests =============
 // Happy path
 // 1. Applies a category filter and updates the product list.
