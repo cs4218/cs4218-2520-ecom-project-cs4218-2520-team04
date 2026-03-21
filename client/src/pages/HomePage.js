@@ -19,6 +19,7 @@ const HomePage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const hasActiveFilters = checked.length > 0 || radio.length > 0;
 
   //get all cat
   const getAllCategory = async () => {
@@ -37,12 +38,14 @@ const HomePage = () => {
     getTotal();
   }, []);
   //get products
-  const getAllProducts = async () => {
+  const getAllProducts = async (pageToLoad = 1, append = false) => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`/api/v1/product/product-list/${page}`);
+      const { data } = await axios.get(`/api/v1/product/product-list/${pageToLoad}`);
       setLoading(false);
-      setProducts(data.products);
+      setProducts((prevProducts) =>
+        append ? [...prevProducts, ...(data?.products || [])] : data?.products || []
+      );
     } catch (error) {
       setLoading(false);
       console.log(error);
@@ -61,18 +64,18 @@ const HomePage = () => {
 
   useEffect(() => {
     if (page === 1) return;
-    loadMore();
+    loadMore(page);
   }, [page]);
   //load more
-  const loadMore = async () => {
+  const loadMore = async (pageToLoad = page) => {
     try {
-      setLoading(true);
-      const { data } = await axios.get(`/api/v1/product/product-list/${page}`);
-      setLoading(false);
-      setProducts([...products, ...data?.products]);
+      if (hasActiveFilters) {
+        await filterProduct(pageToLoad, true);
+        return;
+      }
+      await getAllProducts(pageToLoad, true);
     } catch (error) {
       console.log(error);
-      setLoading(false);
     }
   };
 
@@ -87,22 +90,34 @@ const HomePage = () => {
     setChecked(all);
   };
   useEffect(() => {
-    if (!checked.length || !radio.length) getAllProducts();
+    if (!hasActiveFilters) {
+      setPage(1);
+      getAllProducts(1);
+    }
   }, [checked.length, radio.length]);
 
   useEffect(() => {
-    if (checked.length || radio.length) filterProduct();
+    if (hasActiveFilters) {
+      setPage(1);
+      filterProduct(1);
+    }
   }, [checked, radio]);
 
   //get filterd product
-  const filterProduct = async () => {
+  const filterProduct = async (pageToLoad = 1, append = false) => {
     try {
+      setLoading(true);
       const { data } = await axios.post("/api/v1/product/product-filters", {
         checked,
         radio,
+        page: pageToLoad,
       });
-      setProducts(data?.products);
+      setLoading(false);
+      setProducts((prevProducts) =>
+        append ? [...prevProducts, ...(data?.products || [])] : data?.products || []
+      );
     } catch (error) {
+      setLoading(false);
       console.log(error);
     }
   };
