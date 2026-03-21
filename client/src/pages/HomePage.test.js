@@ -200,6 +200,7 @@ describe("HomePage Component", () => {
       await waitFor(() => {
         expect(axios.post).toHaveBeenCalledWith(FILTER_URL, {
           checked: [],
+          page: 1,
           radio: [20, 39],
         });
       });
@@ -232,6 +233,7 @@ describe("HomePage Component", () => {
       await waitFor(() => {
         expect(axios.post).toHaveBeenCalledWith(FILTER_URL, {
           checked: [CATEGORY_ONE._id],
+          page: 1,
           radio: [],
         });
       });
@@ -270,6 +272,7 @@ describe("HomePage Component", () => {
       await waitFor(() => {
         expect(axios.post).toHaveBeenLastCalledWith(FILTER_URL, {
           checked: [],
+          page: 1,
           radio: [20, 39],
         });
       });
