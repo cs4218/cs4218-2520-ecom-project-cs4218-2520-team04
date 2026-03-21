@@ -398,6 +398,7 @@ describe("POST /api/v1/product/braintree/payment", () => {
           { _id: secondProduct._id.toString(), price: secondProduct.price },
         ];
         const resultObj = { transaction: { id: "txn-1", status: "submitted" } };
+        const orderCountBeforeRequest = await orderModel.countDocuments({});
         getMockBraintreeGateway().transaction.sale.mockImplementationOnce(
           (payload, callback) => callback(null, resultObj),
         );
@@ -415,6 +416,7 @@ describe("POST /api/v1/product/braintree/payment", () => {
         // Assert
         expect(res.status).toBe(200);
         expect(res.body).toEqual({ ok: true });
+        expect(await orderModel.countDocuments({})).toBe(orderCountBeforeRequest + 1);
         expect(savedOrder).not.toBeNull();
         expect(
           savedOrder.products.map((productId) => productId.toString()),
@@ -423,6 +425,107 @@ describe("POST /api/v1/product/braintree/payment", () => {
         expect(savedOrder.buyer.toString()).toBe(shopper._id.toString());
       });
     });
+  });
+});
+
+// Teo Kai Xiang, A0272558U
+describe("Complete Braintree route flow - token to payment", () => {
+  let shopper;
+  let shopperToken;
+  let firstProduct;
+  let secondProduct;
+
+  beforeAll(async () => {
+    shopper = await userModel.create({
+      name: "Flow Shopper",
+      email: "flow-shopper@test.com",
+      password: "pass123",
+      phone: "80000006",
+      address: "6 Payment Street",
+      answer: "flow-answer",
+      role: 0,
+    });
+    shopperToken = jwt.sign({ _id: shopper._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+  });
+
+  afterAll(async () => {
+    await userModel.deleteOne({ email: "flow-shopper@test.com" });
+  });
+
+  beforeEach(async () => {
+    const category = await categoryModel.create({
+      name: "Flow Checkout",
+      slug: "flow-checkout",
+    });
+    [firstProduct, secondProduct] = await productModel.create([
+      {
+        name: "Phone",
+        slug: "phone",
+        description: "A test phone",
+        price: 20,
+        category: category._id,
+        quantity: 3,
+      },
+      {
+        name: "Case",
+        slug: "case",
+        description: "A test case",
+        price: 5,
+        category: category._id,
+        quantity: 7,
+      },
+    ]);
+  });
+
+  test("gets a client token first, then completes payment and creates an order", async () => {
+    // Arrange
+    const tokenResponse = { clientToken: "sandbox-client-token-4242" };
+    const paymentResponse = { transaction: { id: "txn-flow", status: "submitted" } };
+    const cart = [
+      { _id: firstProduct._id.toString(), price: firstProduct.price },
+      { _id: secondProduct._id.toString(), price: secondProduct.price },
+    ];
+    const orderCountBeforeRequest = await orderModel.countDocuments({});
+
+    getMockBraintreeGateway().clientToken.generate.mockImplementationOnce(
+      (payload, callback) => callback(null, tokenResponse),
+    );
+    getMockBraintreeGateway().transaction.sale.mockImplementationOnce(
+      (payload, callback) => callback(null, paymentResponse),
+    );
+
+    // Act
+    const tokenRes = await request(app)
+      .get("/api/v1/product/braintree/token")
+      .set("Authorization", shopperToken);
+
+    // In the real browser flow, a sandbox card like 4242 4242 4242 4242 would be
+    // entered into Braintree DropIn, which would exchange it for a nonce. At this
+    // backend route layer we simulate only the post-DropIn step by sending a nonce.
+    const paymentRes = await request(app)
+      .post("/api/v1/product/braintree/payment")
+      .set("Authorization", shopperToken)
+      .send({
+        nonce: "nonce-generated-from-sandbox-4242-card",
+        cart,
+      });
+    const savedOrder = await waitForOrderByBuyer(shopper._id);
+
+    // Assert
+    expect(tokenRes.status).toBe(200);
+    expect(tokenRes.body).toEqual(tokenResponse);
+    expect(paymentRes.status).toBe(200);
+    expect(paymentRes.body).toEqual({ ok: true });
+    expect(await orderModel.countDocuments({})).toBe(orderCountBeforeRequest + 1);
+    expect(savedOrder).not.toBeNull();
+    expect(savedOrder.products.map((productId) => productId.toString())).toEqual([
+      firstProduct._id.toString(),
+      secondProduct._id.toString(),
+    ]);
+    expect(savedOrder.payment).toEqual(paymentResponse);
+    expect(savedOrder.buyer.toString()).toBe(shopper._id.toString());
   });
 });
 
