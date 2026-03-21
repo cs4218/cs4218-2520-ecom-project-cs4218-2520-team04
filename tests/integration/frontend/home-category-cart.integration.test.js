@@ -118,12 +118,28 @@ const getProductNames = (products) => products.map((product) => product.name);
 const getCartPriceLabel = (product) => `Price : ${product.price}`;
 
 const defaultFilterResponses = {
-  [buildFilterKey({ checked: [CATEGORY_ID] })]: categoryFilteredProducts,
-  [buildFilterKey({ radio: PRICE_RANGE })]: priceFilteredProducts,
+  [buildFilterKey({ checked: [CATEGORY_ID] })]: {
+    products: categoryFilteredProducts,
+    total: categoryFilteredProducts.length,
+  },
+  [buildFilterKey({ radio: PRICE_RANGE })]: {
+    products: priceFilteredProducts,
+    total: priceFilteredProducts.length,
+  },
   [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE })]:
-    combinedFilteredProductsPageOne,
+    {
+      products: combinedFilteredProductsPageOne,
+      total:
+        combinedFilteredProductsPageOne.length +
+        combinedFilteredProductsPageTwo.length,
+    },
   [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE, page: 2 })]:
-    combinedFilteredProductsPageTwo,
+    {
+      products: combinedFilteredProductsPageTwo,
+      total:
+        combinedFilteredProductsPageOne.length +
+        combinedFilteredProductsPageTwo.length,
+    },
 };
 
 const CartStateProbe = () => {
@@ -193,15 +209,15 @@ const setupHttpMocks = ({
       return Promise.reject(new Error(`Unhandled POST request: ${url}`));
     }
 
-    const products = mergedFilterResponses[buildFilterKey(payload)];
-    if (!products) {
+    const response = mergedFilterResponses[buildFilterKey(payload)];
+    if (!response) {
       return Promise.reject(
         new Error(`Unhandled filter payload: ${JSON.stringify(payload)}`),
       );
     }
 
     return Promise.resolve({
-      data: { products },
+      data: response,
     });
   });
 };
@@ -511,7 +527,10 @@ describe("[Integration] Home shopper flows", () => {
     it("renders an empty result set gracefully when a category and price combination matches nothing", async () => {
       setupHttpMocks({
         filterResponses: {
-          [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE })]: [],
+          [buildFilterKey({ checked: [CATEGORY_ID], radio: PRICE_RANGE })]: {
+            products: [],
+            total: 0,
+          },
         },
       });
 

@@ -267,14 +267,23 @@ export const updateProductController = async (req, res) => {
 // filters
 export const productFiltersController = async (req, res) => {
   try {
-    const { checked = [], radio = [] } = req.body;
+    const perPage = 6;
+    const { checked = [], radio = [], page = 1 } = req.body;
+    const normalizedPage = Number(page) > 0 ? Number(page) : 1;
     let args = {};
     if (checked.length > 0) args.category = checked;
     if (radio.length == 2) args.price = { $gte: radio[0], $lte: radio[1] };
-    const products = await productModel.find(args);
+    const total = await productModel.countDocuments(args);
+    const products = await productModel
+      .find(args)
+      .select("-photo")
+      .skip((normalizedPage - 1) * perPage)
+      .limit(perPage)
+      .sort({ createdAt: -1 });
     res.status(200).send({
       success: true,
       products,
+      total,
     });
   } catch (error) {
     console.log(error);

@@ -92,6 +92,7 @@ const HomePage = () => {
   useEffect(() => {
     if (!hasActiveFilters) {
       setPage(1);
+      getTotal();
       getAllProducts(1);
     }
   }, [checked.length, radio.length]);
@@ -113,6 +114,7 @@ const HomePage = () => {
         page: pageToLoad,
       });
       setLoading(false);
+      setTotal(data?.total ?? 0);
       setProducts((prevProducts) =>
         append ? [...prevProducts, ...(data?.products || [])] : data?.products || []
       );

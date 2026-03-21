@@ -186,7 +186,7 @@ describe("HomePage Component", () => {
       };
       mockAxiosByUrl(axios.get, responses);
       mockAxiosByUrl(axios.post, {
-        [FILTER_URL]: { data: { products: PRODUCTS } },
+        [FILTER_URL]: { data: { products: PRODUCTS, total: PRODUCTS.length } },
       });
 
       // ------------ Act ------------
@@ -219,7 +219,7 @@ describe("HomePage Component", () => {
       };
       mockAxiosByUrl(axios.get, responses);
       mockAxiosByUrl(axios.post, {
-        [FILTER_URL]: { data: { products: PRODUCTS } },
+        [FILTER_URL]: { data: { products: PRODUCTS, total: PRODUCTS.length } },
       });
 
       // ------------ Act ------------
@@ -252,7 +252,7 @@ describe("HomePage Component", () => {
       };
       mockAxiosByUrl(axios.get, responses);
       mockAxiosByUrl(axios.post, {
-        [FILTER_URL]: { data: { products: PRODUCTS } },
+        [FILTER_URL]: { data: { products: PRODUCTS, total: PRODUCTS.length } },
       });
 
       // ------------ Act ------------
