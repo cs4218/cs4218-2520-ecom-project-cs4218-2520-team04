@@ -32,7 +32,7 @@ jobs:
       - name: Gather context & run AI review
         id: review
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_API_KEY: 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
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
