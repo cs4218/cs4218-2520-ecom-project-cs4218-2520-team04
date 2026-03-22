@@ -87,7 +87,7 @@ test.describe("User interface", () => {
 // regression testing
 test.describe("PageNotFound — Regression", () => {
     test("clicking back from 404 returns to the previous valid page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.goto("/invalid-route");
         await page.goBack();
         await expect(page).toHaveURL("/");

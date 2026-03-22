@@ -26,7 +26,7 @@ test.describe("Functional E2E", () => {
     });
 
     test("About page is reachable by clicking the About link in the Footer", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.click("div.footer a[href='/about']");
         await expect(page).toHaveURL("/about");
     });
@@ -69,7 +69,7 @@ test.describe("About — User interface", () => {
 test.describe("About — Regression", () => {
     test("About page loads correctly after navigating away and back", async ({ page }) => {
         await page.goto("/about");
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.goBack();
         await expect(page).toHaveURL("/about");
         await expect(page.locator("nav")).toBeVisible();
@@ -78,7 +78,7 @@ test.describe("About — Regression", () => {
     test("About page renders consistently on repeated visits", async ({ page }) => {
         await page.goto("/about");
         const content1 = await page.locator("main").textContent();
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.goto("/about");
         const content2 = await page.locator("main").textContent();
         expect(content1).toBe(content2);

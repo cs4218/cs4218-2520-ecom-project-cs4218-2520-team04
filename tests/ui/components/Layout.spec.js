@@ -18,12 +18,12 @@ test.use({ storageState: { cookies: [], origins: [] } });
 // user flow for pages in my scope (home, About, Contact, Policy)
 test.describe("Functional E2E", () => {
     test("Header is present when navigating to the home page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await expect(page.locator("nav")).toBeVisible();
     });
 
     test("Footer is present when navigating to the home page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await expect(page.locator("div.footer")).toBeVisible();
     });
 
@@ -58,13 +58,13 @@ test.describe("Functional E2E", () => {
     });
 
     test("browser tab title is non-empty on the home page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         const title = await page.title();
         expect(title.trim()).not.toBe("");
     });
 
     test("browser tab title changes when navigating between pages", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         const homeTitle = await page.title();
         await page.goto("/about");
         const aboutTitle = await page.title();
@@ -84,13 +84,13 @@ test.describe("Functional E2E", () => {
 // ui elements that users see
 test.describe("User interface", () => {
     test("Header is positioned at the top of the page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         const navBox = await page.locator("nav").boundingBox();
         expect(navBox?.y).toBeLessThan(100);
     });
 
     test("Footer is positioned below the main content area", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         const footerBox = await page.locator("div.footer").boundingBox();
         const mainBox = await page.locator("main").boundingBox();
         if (footerBox && mainBox) {
@@ -99,7 +99,7 @@ test.describe("User interface", () => {
     });
 
     test("main content does not overlap with Header", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         const navBox = await page.locator("nav").boundingBox();
         const mainBox = await page.locator("main").boundingBox();
         if (navBox && mainBox) {
@@ -108,7 +108,7 @@ test.describe("User interface", () => {
     });
 
     test("main content does not overlap with Footer", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         const footerBox = await page.locator("div.footer").boundingBox();
         const mainBox = await page.locator("main").boundingBox();
         if (footerBox && mainBox) {
@@ -129,7 +129,7 @@ test.describe("User interface", () => {
 // regression testing
 test.describe("Layout — Regression", () => {
     test("Header and Footer present after navigating back", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.goto("/about");
         await page.goBack();
         await expect(page.locator("nav")).toBeVisible();

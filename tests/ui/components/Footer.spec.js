@@ -21,40 +21,40 @@ test.use({ storageState: { cookies: [], origins: [] } });
 // user flow
 test.describe("Functional E2E", () => {
     test("About link navigates to /about and loads About page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.click("div.footer a[href='/about']");
         await expect(page).toHaveURL("/about");
         await expect(page.locator("main")).toBeVisible();
     });
 
     test("Contact link navigates to /contact and loads Contact page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.click("div.footer a[href='/contact']");
         await expect(page).toHaveURL("/contact");
         await expect(page.locator("main")).toBeVisible();
     });
 
     test("Privacy Policy link navigates to /policy and loads Policy page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.click("div.footer a[href='/policy']");
         await expect(page).toHaveURL("/policy");
         await expect(page.locator("main")).toBeVisible();
     });
 
     test("About page is reachable from About link", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.locator("div.footer a[href='/about']").click();
         await expect(page).toHaveURL("/about");
     });
 
     test("Contact page is reachable from Contact link", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.locator("div.footer a[href='/contact']").click();
         await expect(page).toHaveURL("/contact");
     });
 
     test("Policy page is reachable from Privacy Policy link", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.locator("div.footer a[href='/policy']").click();
         await expect(page).toHaveURL("/policy");
     });
@@ -63,7 +63,7 @@ test.describe("Functional E2E", () => {
 // ui elements that users see
 test.describe("User interface", () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
     });
 
     test("copyright text is visible at the bottom of the page", async ({ page }) => {
@@ -96,7 +96,7 @@ test.describe("User interface", () => {
 // regression testing
 test.describe("Regression", () => {
     test("footer renders consistently on the home page", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await expect(page.locator("div.footer")).toBeVisible();
         await expect(page.locator("div.footer")).toContainText("All Rights Reserved");
     });
@@ -120,7 +120,7 @@ test.describe("Regression", () => {
     });
 
     test("footer links still navigate correctly when not logged in", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.click("div.footer a[href='/about']");
         await expect(page).toHaveURL("/about");
     });

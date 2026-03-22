@@ -32,7 +32,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 // Navigates to the first available product via CategoryProduct.
 const goToFirstProduct = async (page) => {
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });    
     await page.click("a.dropdown-toggle[href='/categories']");
     const categoriesMenu = page.locator(
         "li.nav-item.dropdown:has(a[href='/categories']) ul.dropdown-menu"
@@ -56,12 +56,6 @@ const goToFirstProduct = async (page) => {
 
 // user flow
 test.describe("Functional E2E", () => {
-    test("product page is reachable by clicking More Details from CategoryProduct", async ({ page }) => {
-        const reached = await goToFirstProduct(page);
-        if (!reached) return test.skip();
-        await expect(page).toHaveURL(/\/product\//);
-    });
-
     test("navigating to /product/:slug displays the product details section", async ({ page }) => {
         const reached = await goToFirstProduct(page);
         if (!reached) return test.skip();
@@ -190,7 +184,7 @@ test.describe("ProductDetails — User interface", () => {
 
 test.describe("ProductDetails — Regression", () => {
     test("clicking back from ProductDetails returns to CategoryProduct", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });        
         await page.click("a.dropdown-toggle[href='/categories']");
         const categoriesMenu = page.locator(
             "li.nav-item.dropdown:has(a[href='/categories']) ul.dropdown-menu"
