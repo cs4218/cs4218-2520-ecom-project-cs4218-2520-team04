@@ -212,7 +212,7 @@ test.describe("Regression", () => {
         await getUserDropdownToggle(page).click();
         await page.getByText(/logout/i).click();
         await expect(page.locator("a[href='/login']")).toBeVisible();
-        await page.goBack();
+        await page.goBack({ waitUntil: "domcontentloaded" });
         // Session should still be cleared after pressing back
         await expect(page.locator("a[href='/login']")).toBeVisible();
     });
@@ -241,7 +241,9 @@ test.describe("Regression", () => {
     test("Header renders correctly after navigating between multiple pages", async ({ page }) => {
         const routes = ["/", "/about", "/contact", "/policy"];
         for (const route of routes) {
-            await page.goto(route);
+            await page.goto(route, {
+                waitUntil: route === "/" ? "domcontentloaded" : "load"
+            });            
             await expect(page.locator("nav")).toBeVisible();
             await expect(page.locator("a.navbar-brand")).toBeVisible();
         }

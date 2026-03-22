@@ -139,7 +139,9 @@ test.describe("Layout — Regression", () => {
     test("page title is never empty on any static route", async ({ page }) => {
         const routes = ["/", "/about", "/contact", "/policy"];
         for (const route of routes) {
-            await page.goto(route);
+            await page.goto(route, {
+                waitUntil: route === "/" ? "domcontentloaded" : "load"
+            });                        
             const title = await page.title();
             expect(title.trim()).not.toBe("");
         }
