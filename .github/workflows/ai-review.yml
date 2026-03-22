@@ -1,0 +1,59 @@
+name: AI Behavioural Review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    # Skip for trivial changes (docs-only, CI config, etc.)
+    if: >
+      !contains(github.event.pull_request.title, '[skip-ai-review]')
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0          # full history so we can diff against base
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install openai
+
+      - name: Gather context & run AI review
+        id: review
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python .github/scripts/ai_review.py > review_output.md
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete any previous AI review comment to avoid clutter
+          COMMENT_ID=$(gh api \
+            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '.[] | select(.body | startswith("## 🤖 AI Behavioural Review")) | .id' \
+            2>/dev/null | head -1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api -X DELETE \
+              "repos/${{ github.repository }}/issues/comments/$COMMENT_ID"
+          fi
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body-file review_output.md
