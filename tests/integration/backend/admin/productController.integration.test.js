@@ -236,6 +236,7 @@ describe("GET /api/v1/product/braintree/token", () => {
   });
 });
 
+// Teo Kai Xiang, A0272558U
 describe("POST /api/v1/product/braintree/payment", () => {
   describe("failure path", () => {
     test("rejects an unauthenticated request and does not persist an order", async () => {
@@ -428,7 +429,9 @@ describe("POST /api/v1/product/braintree/payment", () => {
         // Assert
         expect(res.status).toBe(200);
         expect(res.body).toEqual({ ok: true });
-        expect(await orderModel.countDocuments({})).toBe(orderCountBeforeRequest + 1);
+        expect(await orderModel.countDocuments({})).toBe(
+          orderCountBeforeRequest + 1,
+        );
         expect(savedOrder).not.toBeNull();
         expect(
           savedOrder.products.map((productId) => productId.toString()),
@@ -496,7 +499,9 @@ describe("Complete Braintree route flow - token to payment", () => {
     // Flow: seed shopper, JWT, category, and products -> mock token generation -> mock payment approval -> GET token -> POST payment -> assert saved order.
     // Arrange
     const tokenResponse = { clientToken: "sandbox-client-token-4242" };
-    const paymentResponse = { transaction: { id: "txn-flow", status: "submitted" } };
+    const paymentResponse = {
+      transaction: { id: "txn-flow", status: "submitted" },
+    };
     const cart = [
       { _id: firstProduct._id.toString(), price: firstProduct.price },
       { _id: secondProduct._id.toString(), price: secondProduct.price },
@@ -532,12 +537,13 @@ describe("Complete Braintree route flow - token to payment", () => {
     expect(tokenRes.body).toEqual(tokenResponse);
     expect(paymentRes.status).toBe(200);
     expect(paymentRes.body).toEqual({ ok: true });
-    expect(await orderModel.countDocuments({})).toBe(orderCountBeforeRequest + 1);
+    expect(await orderModel.countDocuments({})).toBe(
+      orderCountBeforeRequest + 1,
+    );
     expect(savedOrder).not.toBeNull();
-    expect(savedOrder.products.map((productId) => productId.toString())).toEqual([
-      firstProduct._id.toString(),
-      secondProduct._id.toString(),
-    ]);
+    expect(
+      savedOrder.products.map((productId) => productId.toString()),
+    ).toEqual([firstProduct._id.toString(), secondProduct._id.toString()]);
     expect(savedOrder.payment).toEqual(paymentResponse);
     expect(savedOrder.buyer.toString()).toBe(shopper._id.toString());
   });

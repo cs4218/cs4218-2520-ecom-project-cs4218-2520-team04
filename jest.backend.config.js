@@ -13,6 +13,7 @@ export default {
     "<rootDir>/middlewares/*.test.js",
     "<rootDir>/config/*.test.js",
   ],
+  testPathIgnorePatterns: ["\\.integration\\.test\\.js$"],
 
   // jest code coverage
   collectCoverage: true,

@@ -32,6 +32,7 @@ export default {
     "<rootDir>/client/src/pages/user/*.test.js",
     "<rootDir>/client/src/context/auth.test.js",
   ],
+  testPathIgnorePatterns: ["\\.integration\\.test\\.js$"],
 
   // jest code coverage
   collectCoverage: true,

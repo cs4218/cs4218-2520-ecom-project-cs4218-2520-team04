@@ -57,6 +57,15 @@ const LOGIN_RESPONSE = {
   },
 };
 
+const AUTH_WITHOUT_ADDRESS = {
+  user: {
+    name: "Checkout User",
+    email: "checkout@test.com",
+    address: "",
+  },
+  token: "token-no-address",
+};
+
 const LocationProbe = () => {
   const location = useLocation();
 
@@ -88,6 +97,7 @@ const renderLoginCheckoutFlow = () =>
 describe("[Integration] Guest checkout login redirect", () => {
   beforeAll(() => {
     jest.spyOn(console, "log").mockImplementation(() => {});
+    jest.spyOn(console, "error").mockImplementation(() => {});
   });
 
   beforeEach(() => {
@@ -196,5 +206,59 @@ describe("[Integration] Guest checkout login redirect", () => {
         screen.getByRole("button", { name: "Make Payment" }),
       ).toBeEnabled();
     });
+  });
+
+  it("removes an item from the cart and updates the empty-cart state", async () => {
+    // Summary: Verifies cart removal updates both the rendered checkout state and persisted cart storage.
+    // Flow: seed guest cart -> render cart page -> click Remove -> assert empty-cart UI and empty stored cart.
+    renderLoginCheckoutFlow();
+
+    await waitFor(() => {
+      expect(screen.getByText("Checkout Keyboard")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /remove/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Your Cart Is Empty/i)).toBeInTheDocument();
+      expect(screen.getByText(/Total : \$0\.00/i)).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("cart"))).toEqual([]);
+    });
+  });
+
+  it("shows the update address button when an authenticated shopper has no saved address", async () => {
+    // Summary: Verifies checkout remains gated when the authenticated user profile does not contain an address.
+    // Flow: seed auth without address plus cart item -> render cart page -> assert Update Address button is shown and payment button stays hidden.
+    localStorage.setItem("auth", JSON.stringify(AUTH_WITHOUT_ADDRESS));
+
+    renderLoginCheckoutFlow();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /update address/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /make payment/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("handles malformed cart JSON gracefully without showing a user-facing error", async () => {
+    // Summary: Verifies invalid cart JSON falls back to an empty cart instead of crashing the checkout page.
+    // Flow: seed malformed cart JSON -> render cart page -> assert guest empty-cart UI renders and cart item text is absent.
+    localStorage.setItem("cart", "{bad json");
+
+    renderLoginCheckoutFlow();
+
+    await waitFor(() => {
+      expect(screen.getByText("Hello Guest")).toBeInTheDocument();
+      expect(screen.getByText(/Your Cart Is Empty/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /cart summary/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(CART_ITEM.name)).not.toBeInTheDocument();
   });
 });
