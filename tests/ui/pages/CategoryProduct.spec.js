@@ -24,7 +24,7 @@ const getCategoryHeading = (page) =>
 
 // helper for category navigation
 const goToFirstCategory = async (page) => {
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.click("a.dropdown-toggle[href='/categories']");
     const categoriesMenu = page.locator(
         "li.nav-item.dropdown:has(a[href='/categories']) ul.dropdown-menu"
@@ -32,12 +32,9 @@ const goToFirstCategory = async (page) => {
     await expect(categoriesMenu).toBeVisible();
     const items = categoriesMenu.locator("a.dropdown-item");
     const count = await items.count();
-    // index 0 = "All Categories", index 1 = first real category
     if (count < 2) return null;
     const href = await items.nth(1).getAttribute("href");
     await items.nth(1).click();
-    // Wait for the category heading to appear in main — confirms the page
-    // has rendered the category response, regardless of whether the name is empty
     await expect(getCategoryHeading(page)).toBeVisible({ timeout: 10000 });
     return href;
 };
@@ -136,7 +133,7 @@ test.describe("CategoryProduct — Regression", () => {
     });
 
     test("switching between different category routes loads different category headings", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });        
         await page.click("a.dropdown-toggle[href='/categories']");
         const categoriesMenu = page.locator(
             "li.nav-item.dropdown:has(a[href='/categories']) ul.dropdown-menu"

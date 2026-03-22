@@ -26,7 +26,7 @@ test.describe("Functional E2E", () => {
     });
 
     test("Policy page is reachable by clicking the Privacy Policy link in the Footer", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.click("div.footer a[href='/policy']");
         await expect(page).toHaveURL("/policy");
     });
@@ -69,7 +69,7 @@ test.describe("User interface", () => {
 test.describe("Policy — Regression", () => {
     test("Policy page loads correctly after navigating away and back", async ({ page }) => {
         await page.goto("/policy");
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.goBack();
         await expect(page).toHaveURL("/policy");
         await expect(page.locator("nav")).toBeVisible();
@@ -78,7 +78,7 @@ test.describe("Policy — Regression", () => {
     test("Policy page renders consistently on repeated visits", async ({ page }) => {
         await page.goto("/policy");
         const content1 = await page.locator("main").textContent();
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.goto("/policy");
         const content2 = await page.locator("main").textContent();
         expect(content1).toBe(content2);

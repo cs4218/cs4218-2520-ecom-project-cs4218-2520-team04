@@ -54,7 +54,7 @@ test.describe("Functional E2E", () => {
         });
 
         test("Categories dropdown opens when clicked and shows category items", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await page.click("a.dropdown-toggle[href='/categories']");
             const categoriesMenu = getCategoriesMenu(page);
             await expect(categoriesMenu).toBeVisible();
@@ -64,7 +64,7 @@ test.describe("Functional E2E", () => {
         });
 
         test("clicking a category item navigates to /category/:slug", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await page.click("a.dropdown-toggle[href='/categories']");
             const categoriesMenu = getCategoriesMenu(page);
             // nth(1) skips "All Categories" at index 0 to get the first real category
@@ -76,26 +76,26 @@ test.describe("Functional E2E", () => {
         });
 
         test("search bar accepts text input and submitting navigates to search results", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await page.fill("input[placeholder='Search']", "laptop");
             await page.click("button.btn-outline-success");
             await expect(page).toHaveURL(/\/search/);
         });
 
         test("admin user sees Dashboard link pointing to /dashboard/admin", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await getUserDropdownToggle(page).click();
             await expect(page.locator("a[href='/dashboard/admin']")).toBeVisible();
         });
 
         test("admin user does not see /dashboard/user link", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await getUserDropdownToggle(page).click();
             await expect(page.locator("a[href='/dashboard/user']")).not.toBeVisible();
         });
 
         test("clicking Logout clears the session and shows Login and Register links", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await getUserDropdownToggle(page).click();
             await page.getByText(/logout/i).click();
             await expect(page.locator("a[href='/login']")).toBeVisible();
@@ -108,24 +108,24 @@ test.describe("Functional E2E", () => {
         test.use({ storageState: { cookies: [], origins: [] } });
 
         test("Login and Register links are visible when not authenticated", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await expect(page.locator("a[href='/login']")).toBeVisible();
             await expect(page.locator("a[href='/register']")).toBeVisible();
         });
 
         test("Logout option is NOT visible when not authenticated", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await expect(page.getByText(/logout/i)).not.toBeVisible();
         });
 
         test("clicking Login navigates to /login", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await page.click("a[href='/login']");
             await expect(page).toHaveURL(/\/login/);
         });
 
         test("clicking Register navigates to /register", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await page.click("a[href='/register']");
             await expect(page).toHaveURL(/\/register/);
         });
@@ -135,13 +135,13 @@ test.describe("Functional E2E", () => {
         test.use({ storageState: "playwright/.user.auth.json" });
 
         test("normal user sees Dashboard link pointing to /dashboard/user", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await getUserDropdownToggle(page).click();
             await expect(page.locator("a[href='/dashboard/user']")).toBeVisible();
         });
 
         test("normal user does not see /dashboard/admin link", async ({ page }) => {
-            await page.goto("/");
+            await page.goto("/", { waitUntil: "domcontentloaded" });
             await getUserDropdownToggle(page).click();
             await expect(page.locator("a[href='/dashboard/admin']")).not.toBeVisible();
         });
@@ -153,7 +153,7 @@ test.describe("User interface", () => {
     test.use({ storageState: "playwright/.auth.json" });
 
     test.beforeEach(async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
     });
 
     test("brand name 'Virtual Vault' is visible in the navbar", async ({ page }) => {
@@ -208,7 +208,7 @@ test.describe("Regression", () => {
     test.use({ storageState: "playwright/.auth.json" });
 
     test("after logout, navigating back does not restore the authenticated session", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await getUserDropdownToggle(page).click();
         await page.getByText(/logout/i).click();
         await expect(page.locator("a[href='/login']")).toBeVisible();
@@ -218,7 +218,7 @@ test.describe("Regression", () => {
     });
 
     test("refreshing the page while logged in keeps the user authenticated", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await expect(page.locator("a[href='/login']")).not.toBeVisible();
         await page.reload();
         // Should still be logged in after refresh
@@ -226,7 +226,7 @@ test.describe("Regression", () => {
     });
 
     test("cart badge count persists correctly after a page refresh", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/", { waitUntil: "domcontentloaded" });
         await page.evaluate(() => {
             localStorage.setItem(
                 "cart",
