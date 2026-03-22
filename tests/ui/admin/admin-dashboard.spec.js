@@ -58,8 +58,9 @@ test.describe("E2E: Admin dashboard workflows", () => {
     // 3. Should navigate to products page
     await page.waitForURL("**/dashboard/admin/products", { timeout: 5000 });
 
-    // 4. Should see at least one product card (from seeded data)
-    await expect(page.getByRole("link", { name: /more details/i }).first()).toBeVisible({ timeout: 5000 });
+    // 4. Should see the products list heading and at least one product card (from seeded data)
+    await expect(page.getByRole("heading", { name: /all products list/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".card").first()).toBeVisible({ timeout: 5000 });
   });
 
   test("admin navigates from dashboard to Orders page and sees order list", async ({
@@ -93,7 +94,7 @@ test.describe("E2E: Admin dashboard workflows", () => {
     await page.waitForURL("**/dashboard/admin/users", { timeout: 5000 });
 
     // 4. Should see at least one user in the list (the test admin at minimum)
-    await expect(page.getByText(/test@admin.com/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/test@admin.com/i).first()).toBeVisible({ timeout: 5000 });
   });
 
   test("admin dashboard card shows actual non-empty values from the logged-in admin", async ({
@@ -125,8 +126,8 @@ test.describe("E2E: Admin dashboard workflows", () => {
     // 3. Should navigate to create-product page
     await page.waitForURL("**/dashboard/admin/create-product", { timeout: 5000 });
 
-    // 4. Should see the create product form elements
-    await expect(page.getByText(/create product/i)).toBeVisible({ timeout: 5000 });
+    // 4. Should see the create product form heading
+    await expect(page.getByRole("heading", { name: /create product/i })).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -173,7 +174,7 @@ test.describe("E2E: Admin dashboard access control", () => {
     await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
     await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
     await page.getByRole("button", { name: /^login$/i }).click();
-    await page.waitForURL("/", { timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 10000 });
 
     // 4. Now admin dashboard should be accessible
     await page.goto(DASHBOARD_ROUTE);

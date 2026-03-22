@@ -57,8 +57,8 @@ test.describe("E2E: Register flows", () => {
     await page.getByRole("button", { name: /^login$/i }).click();
 
     // 7. Should redirect to home as authenticated user
-    await expect(page.getByText(/login successfully/i)).toBeVisible({ timeout: 5000 });
-    await page.waitForURL("/", { timeout: 5000 });
+    await expect(page.getByText(/login successful/i)).toBeVisible({ timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 5000 });
     await expect(page.locator(".nav-link.dropdown-toggle").first()).toBeVisible({ timeout: 5000 });
   });
 

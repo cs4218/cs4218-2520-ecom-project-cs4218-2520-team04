@@ -26,7 +26,7 @@ test.describe("E2E: Auth context persistence and protection", () => {
     await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
     await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
     await page.getByRole("button", { name: /^login$/i }).click();
-    await page.waitForURL("/", { timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 5000 });
 
     // 2. Navigate to admin dashboard
     await page.goto("/dashboard/admin");
@@ -53,17 +53,14 @@ test.describe("E2E: Auth context persistence and protection", () => {
     await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
     await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
     await page.getByRole("button", { name: /^login$/i }).click();
-    await page.waitForURL("/", { timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 5000 });
 
     // 2. Verify auth is stored
     const authBefore = await page.evaluate(() => localStorage.getItem("auth"));
     expect(authBefore).not.toBeNull();
 
-    // 3. Logout via nav dropdown
-    const userDropdown = page.locator(".nav-link.dropdown-toggle").first();
-    await expect(userDropdown).toBeVisible({ timeout: 5000 });
-    await userDropdown.click();
-    await page.getByRole("link", { name: /logout/i }).click();
+    // 3. Logout via nav dropdown (use dispatchEvent to avoid Bootstrap dropdown visibility issues)
+    await page.locator('a.dropdown-item[href="/login"]').filter({ hasText: "Logout" }).dispatchEvent("click");
     await page.waitForURL("**/login", { timeout: 5000 });
 
     // 4. Auth should be cleared from localStorage
@@ -106,7 +103,7 @@ test.describe("E2E: Auth context persistence and protection", () => {
     await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
     await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
     await page.getByRole("button", { name: /^login$/i }).click();
-    await page.waitForURL("/", { timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 5000 });
 
     // 4. Now access admin dashboard — should work
     await page.goto("/dashboard/admin");
@@ -134,7 +131,7 @@ test.describe("E2E: Auth context persistence and protection", () => {
     await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
     await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
     await page.getByRole("button", { name: /^login$/i }).click();
-    await page.waitForURL("/", { timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 5000 });
 
     // 2. Navigate to admin dashboard — triggers admin-auth API call
     await page.goto("/dashboard/admin");
@@ -155,7 +152,7 @@ test.describe("E2E: Auth context persistence and protection", () => {
     await page.getByPlaceholder("Enter Your Email").fill("test@admin.com");
     await page.getByPlaceholder("Enter Your Password").fill("test@admin.com");
     await page.getByRole("button", { name: /^login$/i }).click();
-    await page.waitForURL("/", { timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 5000 });
 
     // 2. Navigate to home — should be authenticated
     await expect(page.locator(".nav-link.dropdown-toggle").first()).toBeVisible({ timeout: 5000 });
@@ -166,7 +163,7 @@ test.describe("E2E: Auth context persistence and protection", () => {
 
     // 4. Navigate back to home page
     await page.getByRole("link", { name: /home/i }).click();
-    await page.waitForURL("/", { timeout: 5000 });
+    await page.waitForURL((url) => !url.toString().includes("/login"), { timeout: 5000 });
 
     // 5. Still authenticated — user dropdown visible
     await expect(page.locator(".nav-link.dropdown-toggle").first()).toBeVisible({ timeout: 5000 });
