@@ -16,6 +16,11 @@ const CartPage = () => {
   const [instance, setInstance] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const canShowPaymentSection =
+    Boolean(clientToken) &&
+    Boolean(auth?.token) &&
+    Boolean(cart?.length) &&
+    Boolean(auth?.user?.address);
 
   //total price
   const totalPrice = () => {
@@ -168,7 +173,7 @@ const CartPage = () => {
                 </div>
               )}
               <div className="mt-2">
-                {!clientToken || !auth?.token || !cart?.length ? (
+                {!canShowPaymentSection ? (
                   ""
                 ) : (
                   <>
@@ -185,7 +190,7 @@ const CartPage = () => {
                     <button
                       className="btn btn-primary"
                       onClick={handlePayment}
-                      disabled={loading || !instance || !auth?.user?.address}
+                      disabled={loading || !instance}
                     >
                       {loading ? "Processing ...." : "Make Payment"}
                     </button>

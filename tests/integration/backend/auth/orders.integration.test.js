@@ -19,11 +19,11 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
-import authRoutes from "../../../routes/authRoute.js";
+import authRoutes from "../../../../routes/authRoute.js";
 
-import orderModel from "../../../models/orderModel.js";
-import userModel from "../../../models/userModel.js";
-import productModel from "../../../models/productModel.js";
+import orderModel from "../../../../models/orderModel.js";
+import userModel from "../../../../models/userModel.js";
+import productModel from "../../../../models/productModel.js";
 
 process.env.JWT_SECRET = "test-jwt-secret-integration";
 

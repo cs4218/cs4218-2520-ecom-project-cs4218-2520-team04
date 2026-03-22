@@ -10,3 +10,6 @@ coverage/
 
 playwright/*.json
 /.idea/
+
+.scannerwork
+sonar-project.properties

@@ -20,8 +20,8 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
-import authRoutes from "../../../routes/authRoute.js";
-import userModel from "../../../models/userModel.js";
+import authRoutes from "../../../../routes/authRoute.js";
+import userModel from "../../../../models/userModel.js";
 
 process.env.JWT_SECRET = "test-jwt-secret-integration";
 

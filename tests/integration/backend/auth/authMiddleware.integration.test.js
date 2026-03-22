@@ -18,13 +18,13 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
-import userModel from "../../../models/userModel.js";
+import userModel from "../../../../models/userModel.js";
 import {
     testController,
     registerController,
     loginController
-} from "../../../controllers/authController.js";
-import { requireSignIn, isAdmin } from "../../../middlewares/authMiddleware.js";
+} from "../../../../controllers/authController.js";
+import { requireSignIn, isAdmin } from "../../../../middlewares/authMiddleware.js";
 
 // Use a fixed test secret so auth middleware and token signing agree
 process.env.JWT_SECRET = "test-jwt-secret-integration";

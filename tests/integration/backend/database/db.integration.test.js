@@ -21,7 +21,7 @@
  * Test suite description is generated with reference to AI and edited.
  */
 import mongoose from "mongoose";
-import connectDB from "../../../config/db";
+import connectDB from "../../../../config/db";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 let mongoServer; // For in-memory MongoDB server

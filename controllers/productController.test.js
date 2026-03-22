@@ -1921,6 +1921,7 @@ describe("productFiltersController", () => {
       body: {
         checked: [],
         radio: [],
+        page: 1,
       },
     };
     res = {
@@ -1941,17 +1942,15 @@ describe("productFiltersController", () => {
       { _id: "2", name: "Product 2", category: "cat2" },
     ];
 
-    // Mock find to simulate category filtering
-    productModel.find.mockImplementation((query) => {
-      // Apply category filter
-      if (query.category) {
-        const filteredProducts = mockAllProducts.filter((p) =>
-          query.category.includes(p.category),
-        );
-        return Promise.resolve(filteredProducts);
-      }
-      return Promise.resolve(mockAllProducts);
-    });
+    const filteredProducts = mockAllProducts.filter((p) =>
+      req.body.checked.includes(p.category),
+    );
+    const sort = jest.fn().mockResolvedValue(filteredProducts);
+    const limit = jest.fn().mockReturnValue({ sort });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ skip });
+    productModel.countDocuments.mockResolvedValue(filteredProducts.length);
+    productModel.find.mockReturnValue({ select });
 
     // Act
     await productFiltersController(req, res);
@@ -1960,9 +1959,13 @@ describe("productFiltersController", () => {
     expect(productModel.find).toHaveBeenCalledWith({
       category: ["cat1"],
     });
+    expect(productModel.countDocuments).toHaveBeenCalledWith({
+      category: ["cat1"],
+    });
     expect(res.send).toHaveBeenCalledWith({
       success: true,
       products: [{ _id: "1", name: "Product 1", category: "cat1" }],
+      total: 1,
     });
   });
 
@@ -1978,17 +1981,15 @@ describe("productFiltersController", () => {
       { _id: "3", name: "Product 3", category: "cat3" },
     ];
 
-    // Mock find to simulate category filtering
-    productModel.find.mockImplementation((query) => {
-      // Apply category filter
-      if (query.category) {
-        const filteredProducts = mockAllProducts.filter((p) =>
-          query.category.includes(p.category),
-        );
-        return Promise.resolve(filteredProducts);
-      }
-      return Promise.resolve(mockAllProducts);
-    });
+    const filteredProducts = mockAllProducts.filter((p) =>
+      req.body.checked.includes(p.category),
+    );
+    const sort = jest.fn().mockResolvedValue(filteredProducts);
+    const limit = jest.fn().mockReturnValue({ sort });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ skip });
+    productModel.countDocuments.mockResolvedValue(filteredProducts.length);
+    productModel.find.mockReturnValue({ select });
 
     // Act
     await productFiltersController(req, res);
@@ -1997,12 +1998,16 @@ describe("productFiltersController", () => {
     expect(productModel.find).toHaveBeenCalledWith({
       category: ["cat1", "cat2"],
     });
+    expect(productModel.countDocuments).toHaveBeenCalledWith({
+      category: ["cat1", "cat2"],
+    });
     expect(res.send).toHaveBeenCalledWith({
       success: true,
       products: [
         { _id: "1", name: "Product 1", category: "cat1" },
         { _id: "2", name: "Product 2", category: "cat2" },
       ],
+      total: 2,
     });
   });
 
@@ -2018,18 +2023,15 @@ describe("productFiltersController", () => {
       { _id: "4", price: 600 }, // will be filtered out
     ];
 
-    // Mock to simulate price filtering
-    productModel.find.mockImplementation((query) => {
-      let results = [...allProducts];
-
-      if (query.price) {
-        results = results.filter(
-          (p) => p.price >= query.price.$gte && p.price <= query.price.$lte,
-        );
-      }
-
-      return Promise.resolve(results);
-    });
+    const filteredProducts = allProducts.filter(
+      (p) => p.price >= req.body.radio[0] && p.price <= req.body.radio[1],
+    );
+    const sort = jest.fn().mockResolvedValue(filteredProducts);
+    const limit = jest.fn().mockReturnValue({ sort });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ skip });
+    productModel.countDocuments.mockResolvedValue(filteredProducts.length);
+    productModel.find.mockReturnValue({ select });
 
     // Act
     await productFiltersController(req, res);
@@ -2038,12 +2040,16 @@ describe("productFiltersController", () => {
     expect(productModel.find).toHaveBeenCalledWith({
       price: { $gte: 100, $lte: 500 },
     });
+    expect(productModel.countDocuments).toHaveBeenCalledWith({
+      price: { $gte: 100, $lte: 500 },
+    });
     expect(res.send).toHaveBeenCalledWith({
       success: true,
       products: [
         { _id: "1", price: 200 },
         { _id: "3", price: 300 },
       ],
+      total: 2,
     });
   });
 
@@ -2067,30 +2073,28 @@ describe("productFiltersController", () => {
       { _id: "7", name: "Product 7", category: "cat3", price: 700 }, // Wrong category + wrong price
     ];
 
-    // Mock to simulate filtering
-    productModel.find.mockImplementation((query) => {
-      let results = [...allProducts];
-
-      // Category filter
-      if (query.category) {
-        results = results.filter((p) => query.category.includes(p.category));
-      }
-
-      // Price filter
-      if (query.price) {
-        results = results.filter(
-          (p) => p.price >= query.price.$gte && p.price <= query.price.$lte,
-        );
-      }
-
-      return Promise.resolve(results);
-    });
+    const filteredProducts = allProducts.filter(
+      (p) =>
+        req.body.checked.includes(p.category) &&
+        p.price >= req.body.radio[0] &&
+        p.price <= req.body.radio[1],
+    );
+    const sort = jest.fn().mockResolvedValue(filteredProducts);
+    const limit = jest.fn().mockReturnValue({ sort });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ skip });
+    productModel.countDocuments.mockResolvedValue(filteredProducts.length);
+    productModel.find.mockReturnValue({ select });
 
     // Act
     await productFiltersController(req, res);
 
     // Assert
     expect(productModel.find).toHaveBeenCalledWith({
+      category: ["cat1", "cat2"],
+      price: { $gte: 100, $lte: 500 },
+    });
+    expect(productModel.countDocuments).toHaveBeenCalledWith({
       category: ["cat1", "cat2"],
       price: { $gte: 100, $lte: 500 },
     });
@@ -2101,42 +2105,93 @@ describe("productFiltersController", () => {
         { _id: "3", name: "Product 3", category: "cat2", price: 300 },
         { _id: "5", name: "Product 5", category: "cat1", price: 450 },
       ],
+      total: 3,
     });
   });
 
   // No filters
   test("should return all products with no filters", async () => {
     const mockProducts = [{ _id: "1" }, { _id: "2" }];
-
-    productModel.find.mockResolvedValue(mockProducts);
+    const sort = jest.fn().mockResolvedValue(mockProducts);
+    const limit = jest.fn().mockReturnValue({ sort });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ skip });
+    productModel.countDocuments.mockResolvedValue(mockProducts.length);
+    productModel.find.mockReturnValue({ select });
 
     await productFiltersController(req, res);
 
     expect(productModel.find).toHaveBeenCalledWith({});
+    expect(productModel.countDocuments).toHaveBeenCalledWith({});
     expect(res.send).toHaveBeenCalledWith({
       success: true,
       products: mockProducts,
+      total: 2,
     });
   });
 
   test("should default checked and radio to empty arrays when omitted from request body", async () => {
     req.body = {};
     const mockProducts = [{ _id: "1" }];
-    productModel.find.mockResolvedValue(mockProducts);
+    const sort = jest.fn().mockResolvedValue(mockProducts);
+    const limit = jest.fn().mockReturnValue({ sort });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ skip });
+    productModel.countDocuments.mockResolvedValue(mockProducts.length);
+    productModel.find.mockReturnValue({ select });
 
     await productFiltersController(req, res);
 
     expect(productModel.find).toHaveBeenCalledWith({});
+    expect(productModel.countDocuments).toHaveBeenCalledWith({});
     expect(res.send).toHaveBeenCalledWith({
       success: true,
       products: mockProducts,
+      total: 1,
+    });
+  });
+
+  test("should paginate filtered products using the requested page", async () => {
+    req.body = {
+      checked: ["cat1"],
+      radio: [],
+      page: 2,
+    };
+
+    const mockProducts = [{ _id: "7", name: "Product 7", category: "cat1" }];
+    const sort = jest.fn().mockResolvedValue(mockProducts);
+    const limit = jest.fn().mockReturnValue({ sort });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const select = jest.fn().mockReturnValue({ skip });
+    productModel.countDocuments.mockResolvedValue(7);
+    productModel.find.mockReturnValue({ select });
+
+    await productFiltersController(req, res);
+
+    expect(productModel.find).toHaveBeenCalledWith({
+      category: ["cat1"],
+    });
+    expect(skip).toHaveBeenCalledWith(6);
+    expect(limit).toHaveBeenCalledWith(6);
+    expect(res.send).toHaveBeenCalledWith({
+      success: true,
+      products: mockProducts,
+      total: 7,
     });
   });
 
   // Error handling
   test("should handle errors gracefully", async () => {
     const error = new Error("Error While Filtering Products");
-    productModel.find.mockRejectedValue(error);
+    productModel.countDocuments.mockResolvedValue(0);
+    const select = jest.fn().mockReturnValue({
+      skip: jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({
+          sort: jest.fn().mockRejectedValue(error),
+        }),
+      }),
+    });
+    productModel.find.mockReturnValue({ select });
 
     await productFiltersController(req, res);
 

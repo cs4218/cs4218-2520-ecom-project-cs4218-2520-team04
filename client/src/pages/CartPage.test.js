@@ -324,7 +324,7 @@ describe("CartPage Component", () => {
       expect(toast.success).not.toHaveBeenCalled();
     });
 
-    it("disables Make Payment button when user has no address", async () => {
+    it("does not render DropIn or Make Payment when user has no address", async () => {
       // ------------ Arrange ------------
       mockAuthValue = {
         token: "auth-token",
@@ -339,10 +339,15 @@ describe("CartPage Component", () => {
       render(<CartPage />);
 
       // ------------ Assert ------------
-      const makePaymentButton = await screen.findByRole("button", {
-        name: "Make Payment",
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Update Address" }),
+        ).toBeInTheDocument();
       });
-      expect(makePaymentButton).toBeDisabled();
+      expect(screen.queryByTestId("dropin")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Make Payment" }),
+      ).not.toBeInTheDocument();
     });
 
     it("disables Make Payment button when DropIn instance is unavailable", async () => {

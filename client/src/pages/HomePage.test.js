@@ -186,7 +186,7 @@ describe("HomePage Component", () => {
       };
       mockAxiosByUrl(axios.get, responses);
       mockAxiosByUrl(axios.post, {
-        [FILTER_URL]: { data: { products: PRODUCTS } },
+        [FILTER_URL]: { data: { products: PRODUCTS, total: PRODUCTS.length } },
       });
 
       // ------------ Act ------------
@@ -200,6 +200,7 @@ describe("HomePage Component", () => {
       await waitFor(() => {
         expect(axios.post).toHaveBeenCalledWith(FILTER_URL, {
           checked: [],
+          page: 1,
           radio: [20, 39],
         });
       });
@@ -218,7 +219,7 @@ describe("HomePage Component", () => {
       };
       mockAxiosByUrl(axios.get, responses);
       mockAxiosByUrl(axios.post, {
-        [FILTER_URL]: { data: { products: PRODUCTS } },
+        [FILTER_URL]: { data: { products: PRODUCTS, total: PRODUCTS.length } },
       });
 
       // ------------ Act ------------
@@ -232,6 +233,7 @@ describe("HomePage Component", () => {
       await waitFor(() => {
         expect(axios.post).toHaveBeenCalledWith(FILTER_URL, {
           checked: [CATEGORY_ONE._id],
+          page: 1,
           radio: [],
         });
       });
@@ -250,7 +252,7 @@ describe("HomePage Component", () => {
       };
       mockAxiosByUrl(axios.get, responses);
       mockAxiosByUrl(axios.post, {
-        [FILTER_URL]: { data: { products: PRODUCTS } },
+        [FILTER_URL]: { data: { products: PRODUCTS, total: PRODUCTS.length } },
       });
 
       // ------------ Act ------------
@@ -270,6 +272,7 @@ describe("HomePage Component", () => {
       await waitFor(() => {
         expect(axios.post).toHaveBeenLastCalledWith(FILTER_URL, {
           checked: [],
+          page: 1,
           radio: [20, 39],
         });
       });

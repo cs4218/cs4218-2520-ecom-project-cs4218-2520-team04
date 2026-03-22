@@ -19,9 +19,9 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
-import userModel from "../../../models/userModel.js";
-import { loginController } from "../../../controllers/authController.js";
-import { hashPassword } from "../../../helpers/authHelper.js";
+import userModel from "../../../../models/userModel.js";
+import { loginController } from "../../../../controllers/authController.js";
+import { hashPassword } from "../../../../helpers/authHelper.js";
 
 process.env.JWT_SECRET = "test-jwt-secret-integration";
 
