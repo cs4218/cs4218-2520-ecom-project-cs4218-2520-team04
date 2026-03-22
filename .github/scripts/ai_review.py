@@ -20,7 +20,7 @@ from openai import OpenAI
 # ---------------------------------------------------------------------------
 # OpenRouter model identifier — swap to any model available on OpenRouter.
 # See https://openrouter.ai/models for the full list.
-MODEL = "qwen/qwen3-next-80b-a3b-instruct:free"
+MODEL = "qwen/qwen3.5-27b"
 MAX_CONTEXT_TOKENS = 80_000          # leave headroom in 128k window
 MAX_FILE_SIZE_BYTES = 100_000        # skip huge generated files
 SKIP_EXTENSIONS = {
