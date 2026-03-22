@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import categoryModel from "../../../models/categoryModel.js";
 import productModel from "../../../models/productModel.js";
+import { getTestMongoUrl } from "../setup/testMongoUrl.js";
 
 dotenv.config();
 
@@ -127,11 +128,66 @@ const ensureMongoConnection = async () => {
     });
   }
 
-  await mongoose.connect(process.env.MONGO_URL);
+  await mongoose.connect(getTestMongoUrl());
+};
+
+const cleanupStaleHomePageUiData = async () => {
+  await ensureMongoConnection();
+  await productModel.deleteMany({
+    slug: { $regex: /^pw-home-ui-/ },
+  });
+  await categoryModel.deleteMany({
+    slug: { $regex: /^playwright-home-ui-pw-home-ui-/ },
+  });
+};
+
+const seedHomePageUiData = async () => {
+  await ensureMongoConnection();
+  await cleanupStaleHomePageUiData();
+
+  const uniqueTag = `pw-home-ui-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  const category = await categoryModel.create({
+    name: `Playwright Home UI ${uniqueTag}`,
+    slug: `playwright-home-ui-${uniqueTag}`,
+  });
+
+  const [product] = await productModel.create([
+    buildSeededProduct({
+      name: `Home UI Product ${uniqueTag}`,
+      price: 26,
+      categoryId: category._id,
+      slugPrefix: uniqueTag,
+      order: 1,
+    }),
+  ]);
+
+  return {
+    category,
+    product,
+  };
+};
+
+const cleanupSeededHomePageUiData = async ({ categoryId, productId }) => {
+  await ensureMongoConnection();
+  await productModel.deleteOne({ _id: productId });
+  await categoryModel.deleteOne({ _id: categoryId });
+};
+
+const cleanupStaleHomePageLoadMoreData = async () => {
+  await ensureMongoConnection();
+  await productModel.deleteMany({
+    slug: { $regex: /^pw-home-/ },
+  });
+  await categoryModel.deleteMany({
+    slug: { $regex: /^playwright-loadmore-pw-home-/ },
+  });
 };
 
 const seedLoadMoreData = async () => {
   await ensureMongoConnection();
+  await cleanupStaleHomePageLoadMoreData();
 
   const uniqueTag = `pw-home-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const category = await categoryModel.create({
@@ -215,8 +271,19 @@ const cleanupSeededLoadMoreData = async ({ categoryId, productIds }) => {
   await categoryModel.deleteOne({ _id: categoryId });
 };
 
+const cleanupStaleHomePageFilterData = async () => {
+  await ensureMongoConnection();
+  await productModel.deleteMany({
+    slug: { $regex: /^pw-home-filter-/ },
+  });
+  await categoryModel.deleteMany({
+    slug: { $regex: /^playwright-(electronics|books)-pw-home-filter-/ },
+  });
+};
+
 const seedFilterScenarioData = async () => {
   await ensureMongoConnection();
+  await cleanupStaleHomePageFilterData();
 
   const uniqueTag = `pw-home-filter-${Date.now()}-${Math.random()
     .toString(36)
@@ -648,6 +715,22 @@ test.describe("Functional E2E", () => {
 });
 
 test.describe("User interface", () => {
+  let seededUiData;
+
+  test.beforeEach(async () => {
+    seededUiData = await seedHomePageUiData();
+  });
+
+  test.afterEach(async () => {
+    if (!seededUiData) return;
+
+    await cleanupSeededHomePageUiData({
+      categoryId: seededUiData.category._id,
+      productId: seededUiData.product._id,
+    });
+    seededUiData = null;
+  });
+
   test("shows the banner, product heading, and filter section headings", async ({
     page,
   }) => {

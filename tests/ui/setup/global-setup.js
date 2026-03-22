@@ -8,6 +8,8 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
+import { seedPlaywrightAdminUser } from "./seedTestUsers.js";
+import { getTestMongoUrl } from "./testMongoUrl.js";
 
 dotenv.config();
 
@@ -26,18 +28,10 @@ const orderSchema = new mongoose.Schema(
 );
 
 export default async function globalSetup() {
-  await mongoose.connect(process.env.MONGO_URL);
+  await mongoose.connect(getTestMongoUrl());
 
-  // Find the test admin user
-  const user = await mongoose.connection.db
-    .collection("users")
-    .findOne({ email: "test@admin.com" });
-
-  if (!user) {
-    console.warn("[global-setup] test@admin.com not found — orders test may skip");
-    await mongoose.disconnect();
-    return;
-  }
+  // Ensure the shared Playwright admin account exists before seeding order data.
+  const user = await seedPlaywrightAdminUser();
 
   // Seed one test order with a recognisable marker in payment
   const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);

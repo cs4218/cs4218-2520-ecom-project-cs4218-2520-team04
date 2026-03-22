@@ -3,7 +3,7 @@ const { defineConfig, devices } = require("@playwright/test");
 
 /**
  * Playwright config for Tan Wei Lian, A0269750U — UI (E2E) tests.
- * Backend: http://localhost:6060  (node server.js, PORT=6060)
+ * Backend: http://localhost:6060  (node tests/ui/setup/start-test-server.js, PORT=6060)
  * Client:  http://localhost:3000  (CRA dev server, proxies /api/* to 6060)
  */
 module.exports = defineConfig({
@@ -56,9 +56,11 @@ module.exports = defineConfig({
       timeout: 120 * 1000,
     },
     {
-      command: "node server.js",
+      command: "node tests/ui/setup/start-test-server.js",
       url: "http://localhost:6060",
-      reuseExistingServer: !process.env.CI,
+      // Always start the dedicated test server so UI auth/data seeding and
+      // the running backend point at the same Mongo database.
+      reuseExistingServer: false,
       timeout: 60 * 1000,
     },
   ],

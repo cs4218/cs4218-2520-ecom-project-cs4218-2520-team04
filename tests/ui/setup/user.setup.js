@@ -6,10 +6,13 @@
 
 import { test as setup, expect } from "@playwright/test";
 import path from "path";
+import { seedPlaywrightNormalUser } from "./seedTestUsers.js";
 
 const userAuthFile = path.join("playwright", ".user.auth.json");
 
 setup("authenticate as normal user", async ({ page }) => {
+  await seedPlaywrightNormalUser();
+
   await page.goto("/login");
 
   await page.getByPlaceholder("Enter Your Email ").fill("user@test.com");

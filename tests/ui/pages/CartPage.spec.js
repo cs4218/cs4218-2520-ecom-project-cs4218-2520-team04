@@ -8,6 +8,7 @@ import categoryModel from "../../../models/categoryModel.js";
 import productModel from "../../../models/productModel.js";
 import orderModel from "../../../models/orderModel.js";
 import userModel from "../../../models/userModel.js";
+import { getTestMongoUrl } from "../setup/testMongoUrl.js";
 
 dotenv.config();
 
@@ -106,7 +107,37 @@ const ensureMongoConnection = async () => {
     });
   }
 
-  await mongoose.connect(process.env.MONGO_URL);
+  await mongoose.connect(getTestMongoUrl());
+};
+
+const cleanupStaleCartGuestHomePageData = async () => {
+  await ensureMongoConnection();
+  await productModel.deleteMany({
+    slug: { $regex: /^pw-cart-home-/ },
+  });
+  await categoryModel.deleteMany({
+    slug: { $regex: /^playwright-cart-home-pw-cart-home-/ },
+  });
+};
+
+const cleanupStaleCheckoutHappyPathData = async () => {
+  await ensureMongoConnection();
+
+  const staleProducts = await productModel
+    .find({ slug: { $regex: /^pw-checkout-/ } })
+    .select("_id");
+  const staleProductIds = staleProducts.map((product) => product._id);
+
+  if (staleProductIds.length > 0) {
+    await orderModel.deleteMany({
+      products: { $in: staleProductIds },
+    });
+    await productModel.deleteMany({ _id: { $in: staleProductIds } });
+  }
+
+  await categoryModel.deleteMany({
+    slug: { $regex: /^checkout-pw-checkout-/ },
+  });
 };
 
 const buildCheckoutSeededProduct = ({
@@ -127,17 +158,38 @@ const buildCheckoutSeededProduct = ({
   updatedAt: new Date(Date.now() + 60000 + order * 1000),
 });
 
-const getFirstHomeProduct = async (page) => {
-  const firstCard = getHomeProductCards(page).first();
-  const name =
-    (await firstCard.locator(".card-title").first().textContent())?.trim() || "";
-  const priceText =
-    (await firstCard.locator(".card-price").textContent())?.trim() || "";
+const seedCartGuestHomePageData = async () => {
+  await ensureMongoConnection();
+  await cleanupStaleCartGuestHomePageData();
+
+  const uniqueTag = `pw-cart-home-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  const category = await categoryModel.create({
+    name: `Playwright Cart Home ${uniqueTag}`,
+    slug: `playwright-cart-home-${uniqueTag}`,
+  });
+
+  const [product] = await productModel.create([
+    buildCheckoutSeededProduct({
+      name: `Cart Home Product ${uniqueTag}`,
+      price: 24,
+      categoryId: category._id,
+      slugPrefix: uniqueTag,
+      order: 1,
+    }),
+  ]);
 
   return {
-    name,
-    price: parseCurrency(priceText),
+    categoryId: category._id,
+    product,
   };
+};
+
+const cleanupSeededCartGuestHomePageData = async ({ categoryId, productId }) => {
+  await ensureMongoConnection();
+  await productModel.deleteOne({ _id: productId });
+  await categoryModel.deleteOne({ _id: categoryId });
 };
 
 const seedCartBeforeNavigation = async (page, cartItems) => {
@@ -174,6 +226,7 @@ const ensureLoggedInAddressBeforeNavigation = async (
 
 const seedCheckoutHappyPathData = async () => {
   await ensureMongoConnection();
+  await cleanupStaleCheckoutHappyPathData();
 
   const uniqueTag = `pw-checkout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const category = await categoryModel.create({
@@ -188,13 +241,6 @@ const seedCheckoutHappyPathData = async () => {
       categoryId: category._id,
       slugPrefix: uniqueTag,
       order: 1,
-    }),
-    buildCheckoutSeededProduct({
-      name: `Checkout Beta ${uniqueTag}`,
-      price: 31,
-      categoryId: category._id,
-      slugPrefix: uniqueTag,
-      order: 2,
     }),
   ]);
 
@@ -305,28 +351,33 @@ test.describe("Functional E2E", () => {
     // Flow: open homepage -> add first product -> assert badge increments -> open cart -> assert item name, total, and badge count.
     test.slow();
 
-    await loadHomePage(page);
+    const seededData = await seedCartGuestHomePageData();
 
-    const product = await getFirstHomeProduct(page);
-    if (!product.name) {
-      return test.skip();
+    try {
+      await loadHomePage(page);
+
+      const productCard = getHomeProductCardByName(page, seededData.product.name);
+      await expect(productCard).toHaveCount(1, { timeout: 10000 });
+      await productCard.getByRole("button", { name: "ADD TO CART" }).click();
+      await expect(getCartBadge(page)).toHaveAttribute("title", "1");
+
+      await page.locator("a[href='/cart']").click();
+      await expect(page).toHaveURL("/cart");
+
+      await expect(page.locator(".cart-page")).toContainText(seededData.product.name);
+      await expect(
+        getCartSummary(page).getByRole("heading", { name: /cart summary/i }),
+      ).toBeVisible();
+      await expect(getCartTotalHeading(page)).toContainText(
+        formatCurrency(seededData.product.price),
+      );
+      await expect(getCartBadge(page)).toHaveAttribute("title", "1");
+    } finally {
+      await cleanupSeededCartGuestHomePageData({
+        categoryId: seededData.categoryId,
+        productId: seededData.product._id,
+      });
     }
-
-    const firstCard = getHomeProductCards(page).first();
-    await firstCard.getByRole("button", { name: "ADD TO CART" }).click();
-    await expect(getCartBadge(page)).toHaveAttribute("title", "1");
-
-    await page.locator("a[href='/cart']").click();
-    await expect(page).toHaveURL("/cart");
-
-    await expect(page.locator(".cart-page")).toContainText(product.name);
-    await expect(
-      getCartSummary(page).getByRole("heading", { name: /cart summary/i }),
-    ).toBeVisible();
-    await expect(getCartTotalHeading(page)).toContainText(
-      formatCurrency(product.price),
-    );
-    await expect(getCartBadge(page)).toHaveAttribute("title", "1");
   });
 
   test("guest shopper can remove a product from the cart page", async ({
@@ -544,12 +595,11 @@ test.describe("Functional E2E", () => {
         });
       }
 
-      await expect(page.locator(".dashboard")).toContainText(
-        `Price : ${seededData.products[0].price}`,
-      );
-      await expect(page.locator(".dashboard")).toContainText(
-        `Price : ${seededData.products[1].price}`,
-      );
+      for (const product of seededData.products) {
+        await expect(page.locator(".dashboard")).toContainText(
+          `Price : ${product.price}`,
+        );
+      }
 
       const orderRows = getOrdersTables(page).locator("tbody tr");
       const orderCount = await orderRows.count();

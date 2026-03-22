@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { readFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
+import { getTestMongoUrl } from "./testMongoUrl.js";
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ export default async function globalTeardown() {
   const { orderId } = JSON.parse(readFileSync(tmpPath, "utf8"));
   unlinkSync(tmpPath);
 
-  await mongoose.connect(process.env.MONGO_URL);
+  await mongoose.connect(getTestMongoUrl());
   await mongoose.connection.db
     .collection("orders")
     .deleteOne({ _id: new mongoose.Types.ObjectId(orderId) });
