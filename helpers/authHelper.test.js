@@ -20,7 +20,7 @@ describe('Password Utilities', () => {
 
             const result = await hashPassword(password);
 
-            expect(bcrypt.hash).toHaveBeenCalledWith(password, 10);
+            expect(bcrypt.hash).toHaveBeenCalledWith(password, 8);
             expect(result).toBe(mockHash);
         });
 
