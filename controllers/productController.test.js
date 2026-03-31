@@ -2696,9 +2696,7 @@ describe("productCategoryController", () => {
       { _id: "2", name: "Phone" },
     ];
     categoryModel.findOne.mockResolvedValue(mockCategory);
-    productModel.find.mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockProducts),
-    });
+    productModel.find.mockResolvedValue(mockProducts);
 
     // Act
     await productCategoryController(req, res);
@@ -2715,9 +2713,7 @@ describe("productCategoryController", () => {
   test("should handle null category and return status 404 when category slug does not exist", async () => {
     // Arrange
     categoryModel.findOne.mockResolvedValue(null);
-    productModel.find.mockReturnValue({
-      populate: jest.fn().mockResolvedValue([]),
-    });
+    productModel.find.mockResolvedValue([]);
 
     // Act
     await productCategoryController(req, res);

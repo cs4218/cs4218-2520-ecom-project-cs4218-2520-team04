@@ -391,7 +391,6 @@ export const relatedProductController = async (req, res) => {
 export const productCategoryController = async (req, res) => {
   try {
     const category = await categoryModel.findOne({ slug: req.params.slug });
-    const products = await productModel.find({ category }).populate("category");
     if (!category) {
       return res.status(404).send({
         success: false,
@@ -400,6 +399,9 @@ export const productCategoryController = async (req, res) => {
         products: []
       });
     }
+    // Removed .populate("category") — category data is already available
+    // from the first query, avoiding redundant per-product JOIN queries
+    const products = await productModel.find({ category });
     res.status(200).send({
       success: true,
       category,
