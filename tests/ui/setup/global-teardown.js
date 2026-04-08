@@ -14,12 +14,29 @@ export default async function globalTeardown() {
   const tmpPath = join(process.cwd(), "playwright", ".seed-order-id.json");
   if (!existsSync(tmpPath)) return;
 
-  const { orderId } = JSON.parse(readFileSync(tmpPath, "utf8"));
+  const { orderId, categoryId, productId } = JSON.parse(
+    readFileSync(tmpPath, "utf8")
+  );
   unlinkSync(tmpPath);
 
   await mongoose.connect(getTestMongoUrl());
-  await mongoose.connection.db
+  const db = mongoose.connection.db;
+
+  await db
     .collection("orders")
     .deleteOne({ _id: new mongoose.Types.ObjectId(orderId) });
+
+  if (productId) {
+    await db
+      .collection("products")
+      .deleteOne({ _id: new mongoose.Types.ObjectId(productId) });
+  }
+
+  if (categoryId) {
+    await db
+      .collection("categories")
+      .deleteOne({ _id: new mongoose.Types.ObjectId(categoryId) });
+  }
+
   await mongoose.disconnect();
 }

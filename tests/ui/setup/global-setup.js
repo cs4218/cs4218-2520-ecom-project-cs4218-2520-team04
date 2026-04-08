@@ -42,13 +42,58 @@ export default async function globalSetup() {
     status: "Not Process",
   });
 
-  // Persist ID for teardown
+  // Seed a category and product so ProductDetails / CategoryProduct tests have data.
+  // Use raw collection ops to avoid OverwriteModelError when test specs later
+  // import the canonical model files.
+  const db = mongoose.connection.db;
+  const now = new Date();
+
+  const categoryResult = await db.collection("categories").findOneAndUpdate(
+    { slug: "playwright-seed-category" },
+    {
+      $set: { name: "Playwright Seed Category", slug: "playwright-seed-category" },
+      $setOnInsert: { _id: new mongoose.Types.ObjectId() },
+    },
+    { upsert: true, returnDocument: "after" }
+  );
+  const category = categoryResult;
+
+  const productResult = await db.collection("products").findOneAndUpdate(
+    { slug: "playwright-seed-product" },
+    {
+      $set: {
+        name: "Playwright Seed Product",
+        slug: "playwright-seed-product",
+        description: "A seeded product for Playwright UI tests",
+        price: 29.99,
+        category: category._id,
+        quantity: 10,
+        shipping: true,
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        _id: new mongoose.Types.ObjectId(),
+        createdAt: now,
+      },
+    },
+    { upsert: true, returnDocument: "after" }
+  );
+  const product = productResult;
+
+  // Persist IDs for teardown
   const tmpDir = join(process.cwd(), "playwright");
   // Ensure the playwright/ folder exists before writing seed metadata (prevents ENOENT on fresh machines/CI)
   mkdirSync(tmpDir, { recursive: true });
 
   const tmpPath = join(tmpDir, ".seed-order-id.json");
-  writeFileSync(tmpPath, JSON.stringify({ orderId: order._id.toString() }));
+  writeFileSync(
+    tmpPath,
+    JSON.stringify({
+      orderId: order._id.toString(),
+      categoryId: category._id.toString(),
+      productId: product._id.toString(),
+    })
+  );
 
   await mongoose.disconnect();
 }
