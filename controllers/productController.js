@@ -39,11 +39,11 @@ const buildCheckoutSummary = async (cart = []) => {
   }
 
   const requestedQuantities = normalizedEntries.reduce((acc, entry) => {
-    acc[entry.productId] = (acc[entry.productId] || 0) + entry.quantity;
+    acc.set(entry.productId, (acc.get(entry.productId) || 0) + entry.quantity);
     return acc;
-  }, {});
+  }, new Map());
 
-  const productIds = Object.keys(requestedQuantities);
+  const productIds = Array.from(requestedQuantities.keys());
   const products = await productModel.find({ _id: { $in: productIds } }).select(
     "_id price quantity"
   );
@@ -61,7 +61,7 @@ const buildCheckoutSummary = async (cart = []) => {
     products.map((product) => [product._id.toString(), product])
   );
 
-  for (const [productId, quantity] of Object.entries(requestedQuantities)) {
+  for (const [productId, quantity] of requestedQuantities.entries()) {
     const product = productById.get(productId);
 
     if (!product || product.quantity < quantity) {
@@ -79,7 +79,7 @@ const buildCheckoutSummary = async (cart = []) => {
 
   const total = products.reduce(
     (sum, product) =>
-      sum + product.price * requestedQuantities[product._id.toString()],
+      sum + product.price * requestedQuantities.get(product._id.toString()),
     0
   );
 
@@ -100,7 +100,7 @@ const reserveStock = async (products, requestedQuantities) => {
 
   try {
     for (const product of products) {
-      const quantityToReserve = requestedQuantities[product._id.toString()];
+      const quantityToReserve = requestedQuantities.get(product._id.toString());
       const updatedProduct = await productModel.findOneAndUpdate(
         {
           _id: product._id,
