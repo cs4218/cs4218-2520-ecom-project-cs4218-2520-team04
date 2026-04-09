@@ -1502,6 +1502,7 @@ describe("braintreePaymentController", () => {
         select: jest.fn().mockResolvedValue([{ _id: "p1", price: 10, quantity: 5 }]),
       });
       productModel.findOneAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 4 });
+      productModel.findByIdAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 5 });
       req = mockReq({
         body: { nonce: "nonce-sync-throw", cart: [{ _id: "p1", price: 10 }] },
         user: { _id: "buyer-sync" },
@@ -1522,6 +1523,9 @@ describe("braintreePaymentController", () => {
           message: "Error while processing payment",
         }),
       );
+      expect(productModel.findByIdAndUpdate).toHaveBeenCalledWith("p1", {
+        $inc: { quantity: 1 },
+      });
     });
 
     test("should return 409 when requested quantity exceeds stock", async () => {

@@ -1,3 +1,6 @@
+// A0272558U, Teo Kai Xiang
+// Written by GPT 5.4 based on test plans written by me. Reviewed after
+
 import express from "express";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -90,7 +93,7 @@ describe("Oversized input security testing", () => {
 
   test("search rejects excessively long keywords without hitting product lookup logic", async () => {
     const response = await request(app).get(
-      `/api/v1/product/search/${"k".repeat(101)}`
+      `/api/v1/product/search/${"k".repeat(101)}`,
     );
 
     expect(response.status).toBe(400);

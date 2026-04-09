@@ -23,12 +23,24 @@ const INVALID_LOGIN_MESSAGE = "Invalid email or password";
 const LOGIN_THROTTLED_MESSAGE =
   "Too many failed login attempts. Please try again later.";
 
+const escapeRegex = (value = "") =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildCaseInsensitiveEmailQuery = (email = "") => ({
+  email: {
+    $regex: `^${escapeRegex(email)}$`,
+    $options: "i",
+  },
+});
+
 export const registerController = async (req, res) => {
   try {
     const { name, email, password, phone, address, answer } = req.body;
+    const trimmedEmail = typeof email === "string" ? email.trim() : "";
     const normalizedEmail = normalizeEmail(email);
     //validations
     if (!name) return res.status(400).send({ message: "Name is required" });
+    if (!email) return res.status(400).send({ message: "Email is required" });
     if (!password) return res.status(400).send({ message: "Password is required" });
     if (!phone) return res.status(400).send({ message: "Phone number is required" });
     if (!address) return res.status(400).send({ message: "Address is required" });
@@ -39,7 +51,7 @@ export const registerController = async (req, res) => {
         message: "Invalid input format. Fields must be text strings.",
       });
     }
-    if (!normalizedEmail) return res.status(400).send({ message: "Email is required" });
+    if (!trimmedEmail) return res.status(400).send({ message: "Email is required" });
     if (exceedsMaxLength(name, INPUT_LIMITS.name)) {
       return res.status(400).send({ success: false, message: "Name is too long" });
     }
@@ -60,7 +72,9 @@ export const registerController = async (req, res) => {
     }
 
     //check user
-    const existingUser = await userModel.findOne({ email: normalizedEmail });
+    const existingUser = await userModel.findOne(
+      buildCaseInsensitiveEmailQuery(trimmedEmail)
+    );
     //existing user
     if (existingUser) {
       return res.status(200).send({
@@ -77,7 +91,7 @@ export const registerController = async (req, res) => {
     //save
     const user = await new userModel({
       name,
-      email: normalizedEmail,
+      email: trimmedEmail,
       phone,
       address,
       password: hashedPassword,
@@ -109,6 +123,7 @@ export const registerController = async (req, res) => {
 export const loginController = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const trimmedEmail = typeof email === "string" ? email.trim() : "";
     const normalizedEmail = normalizeEmail(email);
     const requestIp = getRequestIp(req);
     const throttleState = getLoginThrottleState({
@@ -143,7 +158,7 @@ export const loginController = async (req, res) => {
     };
 
     //validation
-    if (!normalizedEmail || !password) {
+    if (!trimmedEmail || !password) {
       return res.status(400).send({
         success: false,
         message: INVALID_LOGIN_MESSAGE,
@@ -165,7 +180,9 @@ export const loginController = async (req, res) => {
       });
     }
     //check user
-    const user = await userModel.findOne({ email: normalizedEmail });
+    const user = await userModel.findOne(
+      buildCaseInsensitiveEmailQuery(trimmedEmail)
+    );
     if (!user) {
       return failLoginAttempt();
     }
@@ -209,6 +226,7 @@ export const loginController = async (req, res) => {
 export const forgotPasswordController = async (req, res) => {
   try {
     const { email, answer, newPassword } = req.body;
+    const trimmedEmail = typeof email === "string" ? email.trim() : "";
     if (!email) {
       return res.status(400).send({ message: "Email is required" });
     }
@@ -235,7 +253,10 @@ export const forgotPasswordController = async (req, res) => {
     }
 
     //check
-    const user = await userModel.findOne({ email: normalizeEmail(email), answer });
+    const user = await userModel.findOne({
+      ...buildCaseInsensitiveEmailQuery(trimmedEmail),
+      answer,
+    });
     //validation
     if (!user) {
       return res.status(404).send({

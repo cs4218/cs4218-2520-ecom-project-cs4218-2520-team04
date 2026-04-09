@@ -1,3 +1,6 @@
+// A0272558U, Teo Kai Xiang
+// Written by GPT 5.4 based on test plans written by me. Reviewed after
+
 import React from "react";
 import express from "express";
 import jwt from "jsonwebtoken";
@@ -116,36 +119,36 @@ const fillRegisterForm = async ({ email, password }) => {
   await userEvent.clear(screen.getByPlaceholderText("Enter Your Name"));
   await userEvent.type(
     screen.getByPlaceholderText("Enter Your Name"),
-    baseRegisterFields.name
+    baseRegisterFields.name,
   );
   await userEvent.clear(screen.getByPlaceholderText("Enter Your Email"));
   await userEvent.type(screen.getByPlaceholderText("Enter Your Email"), email);
   await userEvent.clear(screen.getByPlaceholderText("Enter Your Password"));
   await userEvent.type(
     screen.getByPlaceholderText("Enter Your Password"),
-    password
+    password,
   );
   await userEvent.clear(screen.getByPlaceholderText("Enter Your Phone"));
   await userEvent.type(
     screen.getByPlaceholderText("Enter Your Phone"),
-    baseRegisterFields.phone
+    baseRegisterFields.phone,
   );
   await userEvent.clear(screen.getByPlaceholderText("Enter Your Address"));
   await userEvent.type(
     screen.getByPlaceholderText("Enter Your Address"),
-    baseRegisterFields.address
+    baseRegisterFields.address,
   );
   await userEvent.clear(screen.getByPlaceholderText("Enter Your DOB"));
   await userEvent.type(
     screen.getByPlaceholderText("Enter Your DOB"),
-    baseRegisterFields.dob
+    baseRegisterFields.dob,
   );
   await userEvent.clear(
-    screen.getByPlaceholderText("What is Your Favorite sports")
+    screen.getByPlaceholderText("What is Your Favorite sports"),
   );
   await userEvent.type(
     screen.getByPlaceholderText("What is Your Favorite sports"),
-    baseRegisterFields.answer
+    baseRegisterFields.answer,
   );
 };
 
@@ -156,12 +159,12 @@ describe("Authentication strength testing - backend", () => {
     const responses = await Promise.all(
       Array.from({ length: 100 }, (_, attempt) =>
         request(app)
-        .post("/api/v1/auth/login")
-        .send({
-          email: `probe-${attempt}@example.com`,
-          password: "WrongPass1!",
-        })
-      )
+          .post("/api/v1/auth/login")
+          .send({
+            email: `probe-${attempt}@example.com`,
+            password: "WrongPass1!",
+          }),
+      ),
     );
 
     responses
@@ -180,7 +183,7 @@ describe("Authentication strength testing - backend", () => {
 
     expect(postBurstThrottleResponse.status).toBe(429);
     expect(postBurstThrottleResponse.body.message).toBe(
-      "Too many failed login attempts. Please try again later."
+      "Too many failed login attempts. Please try again later.",
     );
 
     const blockedHealthyLoginResponse = await request(app)
@@ -311,42 +314,40 @@ describe("Authentication strength testing - frontend", () => {
             <Route path="/login" element={<Login />} />
           </Routes>
         </MemoryRouter>
-      </AllProviders>
+      </AllProviders>,
     );
 
     await userEvent.type(
       screen.getByPlaceholderText("Enter Your Email"),
-      "member@example.com"
+      "member@example.com",
     );
     await userEvent.type(
       screen.getByPlaceholderText("Enter Your Password"),
-      "WrongPass1!"
+      "WrongPass1!",
     );
     await userEvent.click(screen.getByRole("button", { name: /login/i }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenNthCalledWith(
         1,
-        "Invalid email or password"
+        "Invalid email or password",
       );
     });
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /^login$/i })
-      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: /^login$/i })).toBeEnabled();
     });
 
     await userEvent.clear(screen.getByPlaceholderText("Enter Your Email"));
     await userEvent.type(
       screen.getByPlaceholderText("Enter Your Email"),
-      "unknown@example.com"
+      "unknown@example.com",
     );
     await userEvent.click(screen.getByRole("button", { name: /^login$/i }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenNthCalledWith(
         2,
-        "Invalid email or password"
+        "Invalid email or password",
       );
     });
 
@@ -375,7 +376,7 @@ describe("Authentication strength testing - frontend", () => {
             <Route path="/register" element={<Register />} />
           </Routes>
         </MemoryRouter>
-      </AllProviders>
+      </AllProviders>,
     );
 
     const passwordInput = screen.getByPlaceholderText("Enter Your Password");
@@ -388,9 +389,7 @@ describe("Authentication strength testing - frontend", () => {
         password: weakPassword,
       });
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /register/i })
-        ).toBeEnabled();
+        expect(screen.getByRole("button", { name: /register/i })).toBeEnabled();
       });
       await userEvent.click(screen.getByRole("button", { name: /register/i }));
 
@@ -398,9 +397,7 @@ describe("Authentication strength testing - frontend", () => {
         expect(toast.error).toHaveBeenLastCalledWith(PASSWORD_POLICY_MESSAGE);
       });
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /register/i })
-        ).toBeEnabled();
+        expect(screen.getByRole("button", { name: /register/i })).toBeEnabled();
       });
 
       expect(axios.post).toHaveBeenLastCalledWith("/api/v1/auth/register", {

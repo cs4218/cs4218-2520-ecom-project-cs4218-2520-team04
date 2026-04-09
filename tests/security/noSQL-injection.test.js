@@ -1,3 +1,6 @@
+// A0272558U, Teo Kai Xiang
+// Written by GPT 5.4 based on test plans written by me. Reviewed after
+
 import express from "express";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -77,10 +80,12 @@ describe("NoSQL injection security testing", () => {
   test("login rejects Mongo operator objects instead of authenticating or crashing", async () => {
     await seedCustomer();
 
-    const response = await request(app).post("/api/v1/auth/login").send({
-      email: { $ne: null },
-      password: { $ne: null },
-    });
+    const response = await request(app)
+      .post("/api/v1/auth/login")
+      .send({
+        email: { $ne: null },
+        password: { $ne: null },
+      });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
@@ -90,14 +95,16 @@ describe("NoSQL injection security testing", () => {
   });
 
   test("register rejects operator payloads for user-controlled fields", async () => {
-    const response = await request(app).post("/api/v1/auth/register").send({
-      name: "Injected User",
-      email: { $gt: "" },
-      password: "StrongPass1!",
-      phone: "80000053",
-      address: "53 User Street",
-      answer: { $ne: null },
-    });
+    const response = await request(app)
+      .post("/api/v1/auth/register")
+      .send({
+        name: "Injected User",
+        email: { $gt: "" },
+        password: "StrongPass1!",
+        phone: "80000053",
+        address: "53 User Street",
+        answer: { $ne: null },
+      });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
@@ -181,7 +188,7 @@ describe("NoSQL injection security testing", () => {
     });
 
     const response = await request(app).get(
-      `/api/v1/product/search/${encodeURIComponent('{"$ne":null}')}`
+      `/api/v1/product/search/${encodeURIComponent('{"$ne":null}')}`,
     );
 
     expect(response.status).toBe(200);

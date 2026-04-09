@@ -1,3 +1,6 @@
+// A0272558U, Teo Kai Xiang
+// Written by GPT 5.4 based on test plans written by me. Reviewed after
+
 import express from "express";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -124,7 +127,7 @@ describe("Checkout validation security testing", () => {
     };
 
     getMockBraintreeGateway().transaction.sale.mockImplementationOnce(
-      (payload, callback) => callback(null, paymentResponse)
+      (payload, callback) => callback(null, paymentResponse),
     );
 
     const response = await request(app)
@@ -151,12 +154,12 @@ describe("Checkout validation security testing", () => {
         amount: 120,
         paymentMethodNonce: "tampered-price-nonce",
       }),
-      expect.any(Function)
+      expect.any(Function),
     );
     expect(savedOrder).not.toBeNull();
-    expect(savedOrder.products.map((productId) => productId.toString())).toEqual([
-      product._id.toString(),
-    ]);
+    expect(
+      savedOrder.products.map((productId) => productId.toString()),
+    ).toEqual([product._id.toString()]);
     expect(refreshedProduct.quantity).toBe(4);
   });
 

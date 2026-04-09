@@ -1,3 +1,5 @@
+// A0272558U, Teo Kai Xiang
+// Written by GPT 5.4 based on test plans written by me. Reviewed after
 import React from "react";
 import express from "express";
 import jwt from "jsonwebtoken";
@@ -140,18 +142,19 @@ describe("Authorization security testing - backend", () => {
     const { customer } = await seedUsers();
     const customerToken = signToken(customer._id);
 
-    const [allOrdersResponse, usersResponse, createCategoryResponse] = await Promise.all([
-      request(app)
-        .get("/api/v1/auth/all-orders")
-        .set("Authorization", customerToken),
-      request(app)
-        .get("/api/v1/auth/users")
-        .set("Authorization", customerToken),
-      request(app)
-        .post("/api/v1/category/create-category")
-        .set("Authorization", customerToken)
-        .send({ name: "Illicit Category" }),
-    ]);
+    const [allOrdersResponse, usersResponse, createCategoryResponse] =
+      await Promise.all([
+        request(app)
+          .get("/api/v1/auth/all-orders")
+          .set("Authorization", customerToken),
+        request(app)
+          .get("/api/v1/auth/users")
+          .set("Authorization", customerToken),
+        request(app)
+          .post("/api/v1/category/create-category")
+          .set("Authorization", customerToken)
+          .send({ name: "Illicit Category" }),
+      ]);
 
     expect(allOrdersResponse.status).toBe(401);
     expect(allOrdersResponse.body.message).toBe("UnAuthorized Access");
@@ -165,7 +168,10 @@ describe("Authorization security testing - backend", () => {
   test("customer cannot update another customer's order by tampering with the orderId on the admin endpoint", async () => {
     const { customer, otherCustomer } = await seedUsers();
     const customerToken = signToken(customer._id);
-    const otherUsersOrder = await seedOrderForBuyer(otherCustomer._id, "victim");
+    const otherUsersOrder = await seedOrderForBuyer(
+      otherCustomer._id,
+      "victim",
+    );
 
     const response = await request(app)
       .put(`/api/v1/auth/order-status/${otherUsersOrder._id}`)
@@ -193,7 +199,7 @@ describe("Authorization security testing - backend", () => {
     expect(response.body).toHaveLength(1);
     expect(response.body[0]._id).toBe(customersOrder._id.toString());
     expect(response.body[0].buyer._id || response.body[0].buyer).toBe(
-      customer._id.toString()
+      customer._id.toString(),
     );
   });
 
@@ -233,7 +239,7 @@ describe("Authorization security testing - frontend", () => {
           role: 0,
         },
         token: "customer-token",
-      })
+      }),
     );
 
     axios.get.mockImplementation((url) => {
@@ -260,7 +266,7 @@ describe("Authorization security testing - frontend", () => {
         <MemoryRouter initialEntries={["/dashboard/admin/users"]}>
           <App />
         </MemoryRouter>
-      </AllProviders>
+      </AllProviders>,
     );
 
     await waitFor(() => {

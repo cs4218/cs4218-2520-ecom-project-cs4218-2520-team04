@@ -1,3 +1,6 @@
+// A0272558U, Teo Kai Xiang
+// Written by GPT 5.4 based on test plans written by me. Reviewed after
+
 import React from "react";
 import express from "express";
 import mongoose from "mongoose";
@@ -53,7 +56,7 @@ describe("Path traversal security testing", () => {
     render(
       <MemoryRouter>
         <Spinner path={"admin/../secrets"} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     act(() => {
@@ -68,7 +71,7 @@ describe("Path traversal security testing", () => {
 
   test("product photo route does not interpret traversal strings as filesystem paths", async () => {
     const response = await request(app).get(
-      "/api/v1/product/product-photo/..%2F..%2Fwindows%2Fwin.ini"
+      "/api/v1/product/product-photo/..%2F..%2Fwindows%2Fwin.ini",
     );
 
     expect(response.status).toBe(500);

@@ -588,6 +588,8 @@ export const braintreeTokenController = async (req, res) => {
 
 //payment
 export const braintreePaymentController = async (req, res) => {
+  let reservedStock = [];
+
   try {
     const { nonce, cart } = req.body;
     const checkoutSummary = await buildCheckoutSummary(cart);
@@ -606,6 +608,7 @@ export const braintreePaymentController = async (req, res) => {
         .status(stockReservation.error.status)
         .send(stockReservation.error.body);
     }
+    reservedStock = stockReservation.reserved || [];
 
     gateway.transaction.sale(
       {
@@ -616,21 +619,34 @@ export const braintreePaymentController = async (req, res) => {
         },
       },
       async function (error, result) {
-        if (result) {
-          await new orderModel({
-            products: checkoutSummary.expandedProductIds,
-            payment: result,
-            buyer: req.user._id,
-          }).save();
-          res.json({ ok: true });
-        } else {
-          await releaseReservedStock(stockReservation.reserved);
-          res.status(500).send(error);
+        try {
+          if (result) {
+            await new orderModel({
+              products: checkoutSummary.expandedProductIds,
+              payment: result,
+              buyer: req.user._id,
+            }).save();
+            reservedStock = [];
+            return res.json({ ok: true });
+          }
+
+          await releaseReservedStock(reservedStock);
+          reservedStock = [];
+          return res.status(500).send(error);
+        } catch (callbackError) {
+          await releaseReservedStock(reservedStock);
+          reservedStock = [];
+          return res.status(500).send({
+            success: false,
+            message: "Error while processing payment",
+            error: callbackError,
+          });
         }
       }
     );
   } catch (error) {
     console.log(error);
+    await releaseReservedStock(reservedStock);
     res.status(500).send({
       success: false,
       message: "Error while processing payment",

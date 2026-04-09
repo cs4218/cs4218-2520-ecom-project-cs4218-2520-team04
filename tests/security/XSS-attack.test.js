@@ -1,3 +1,6 @@
+// A0272558U, Teo Kai Xiang
+// Written by GPT 5.4 based on test plans written by me. Reviewed after
+
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import axios from "axios";
@@ -62,7 +65,7 @@ describe("XSS security testing", () => {
     expect(screen.getByTestId("layout-shell")).toBeInTheDocument();
     expect(screen.getByText(maliciousName)).toBeInTheDocument();
     expect(
-      screen.getByText(`${maliciousDescription.substring(0, 30)}...`)
+      screen.getByText(`${maliciousDescription.substring(0, 30)}...`),
     ).toBeInTheDocument();
     expect(document.querySelector("script")).toBeNull();
     expect(document.querySelector('img[src="x"]')).toBeNull();
@@ -73,9 +76,11 @@ describe("XSS security testing", () => {
     render(<Search />);
 
     expect(
-      screen.getAllByRole("button").map((button) => button.textContent)
+      screen.getAllByRole("button").map((button) => button.textContent),
     ).toEqual(["More Details", "ADD TO CART"]);
-    expect(screen.queryByText("window.__xssAttack = 'name'")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("window.__xssAttack = 'name'"),
+    ).not.toBeInTheDocument();
     expect(window.__xssAttack).toBeUndefined();
   });
 

@@ -131,6 +131,24 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
             }));
         });
 
+        it("should detect an existing mixed-case email without lowercasing stored data", async () => {
+            req.body = {
+                ...testReq,
+                email: "john@example.com",
+            };
+            userModel.findOne.mockResolvedValue({ email: "John@Example.com" });
+
+            await registerController(req, res);
+
+            expect(userModel.findOne).toHaveBeenCalledWith({
+                email: {
+                    $regex: "^john@example\\.com$",
+                    $options: "i",
+                },
+            });
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
+
         it("should return 500 on server error", async () => {
             req.body = testReq;
             userModel.findOne.mockRejectedValue(new Error("DB Error"));
@@ -258,6 +276,31 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
                 message: "Error in login",
             }));
         })
+
+        it("should login with a mixed-case stored email using a lowercase lookup key", async () => {
+            req.body = { email: "john@example.com", password: "password123" };
+            const mockUser = {
+                _id: "123",
+                name: "John",
+                email: "John@Example.com",
+                password: "hashed_password",
+                role: 0
+            };
+
+            userModel.findOne.mockResolvedValue(mockUser);
+            comparePassword.mockResolvedValue(true);
+            JWT.sign.mockReturnValue("mock_token");
+
+            await loginController(req, res);
+
+            expect(userModel.findOne).toHaveBeenCalledWith({
+                email: {
+                    $regex: "^john@example\\.com$",
+                    $options: "i",
+                },
+            });
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
     });
 
     // --- FORGOT PASSWORD TESTS ---
@@ -336,6 +379,23 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
                 message: PASSWORD_POLICY_MESSAGE,
             }));
             expect(userModel.findOne).not.toHaveBeenCalled();
+        });
+
+        it("should find forgot-password users regardless of stored email casing", async () => {
+            req.body = { email: "test@test.com", answer: "blue", newPassword: "NewPass123!" };
+            userModel.findOne.mockResolvedValue({ _id: "user123" });
+            hashPassword.mockResolvedValue("new_hash");
+
+            await forgotPasswordController(req, res);
+
+            expect(userModel.findOne).toHaveBeenCalledWith({
+                email: {
+                    $regex: "^test@test\\.com$",
+                    $options: "i",
+                },
+                answer: "blue",
+            });
+            expect(res.status).toHaveBeenCalledWith(200);
         });
     });
 
