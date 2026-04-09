@@ -17,6 +17,152 @@ var gateway = new braintree.BraintreeGateway({
   privateKey: process.env.BRAINTREE_PRIVATE_KEY,
 });
 
+const buildCheckoutSummary = async (cart = []) => {
+  const normalizedEntries = Array.isArray(cart)
+    ? cart
+        .map((item) => {
+          const productId = item?._id?.toString?.() || item?._id;
+          const quantity = Number.isInteger(Number(item?.quantity)) && Number(item.quantity) > 0
+            ? Number(item.quantity)
+            : 1;
+
+          return productId ? { productId, quantity } : null;
+        })
+        .filter(Boolean)
+    : [];
+
+  if (!normalizedEntries.length) {
+    return {
+      error: { status: 400, body: { success: false, message: "Cart is empty" } },
+    };
+  }
+
+  const requestedQuantities = normalizedEntries.reduce((acc, entry) => {
+    acc[entry.productId] = (acc[entry.productId] || 0) + entry.quantity;
+    return acc;
+  }, {});
+
+  const productIds = Object.keys(requestedQuantities);
+  const products = await productModel.find({ _id: { $in: productIds } }).select(
+    "_id price quantity"
+  );
+
+  if (products.length !== productIds.length) {
+    return {
+      error: {
+        status: 400,
+        body: { success: false, message: "One or more products are invalid" },
+      },
+    };
+  }
+
+  const productById = new Map(
+    products.map((product) => [product._id.toString(), product])
+  );
+
+  for (const [productId, quantity] of Object.entries(requestedQuantities)) {
+    const product = productById.get(productId);
+
+    if (!product || product.quantity < quantity) {
+      return {
+        error: {
+          status: 409,
+          body: {
+            success: false,
+            message: "One or more products are out of stock",
+          },
+        },
+      };
+    }
+  }
+
+  const total = products.reduce(
+    (sum, product) =>
+      sum + product.price * requestedQuantities[product._id.toString()],
+    0
+  );
+
+  const expandedProductIds = normalizedEntries.flatMap((entry) =>
+    Array.from({ length: entry.quantity }, () => entry.productId)
+  );
+
+  return {
+    expandedProductIds,
+    products,
+    requestedQuantities,
+    total,
+  };
+};
+
+const reserveStock = async (products, requestedQuantities) => {
+  const reserved = [];
+
+  try {
+    for (const product of products) {
+      const quantityToReserve = requestedQuantities[product._id.toString()];
+      const updatedProduct = await productModel.findOneAndUpdate(
+        {
+          _id: product._id,
+          quantity: { $gte: quantityToReserve },
+        },
+        {
+          $inc: { quantity: -quantityToReserve },
+        },
+        { new: true }
+      );
+
+      if (!updatedProduct) {
+        throw new Error("OUT_OF_STOCK");
+      }
+
+      reserved.push({
+        productId: product._id,
+        quantity: quantityToReserve,
+      });
+    }
+
+    return { reserved };
+  } catch (error) {
+    if (reserved.length) {
+      await Promise.all(
+        reserved.map((entry) =>
+          productModel.findByIdAndUpdate(entry.productId, {
+            $inc: { quantity: entry.quantity },
+          })
+        )
+      );
+    }
+
+    if (error.message === "OUT_OF_STOCK") {
+      return {
+        error: {
+          status: 409,
+          body: {
+            success: false,
+            message: "One or more products are out of stock",
+          },
+        },
+      };
+    }
+
+    throw error;
+  }
+};
+
+const releaseReservedStock = async (reserved = []) => {
+  if (!reserved.length) {
+    return;
+  }
+
+  await Promise.all(
+    reserved.map((entry) =>
+      productModel.findByIdAndUpdate(entry.productId, {
+        $inc: { quantity: entry.quantity },
+      })
+    )
+  );
+};
+
 export const createProductController = async (req, res) => {
   try {
     const { name, description, price, category, quantity, shipping } =
@@ -437,32 +583,51 @@ export const braintreeTokenController = async (req, res) => {
 export const braintreePaymentController = async (req, res) => {
   try {
     const { nonce, cart } = req.body;
-    let total = 0;
-    cart.map((i) => {
-      total += i.price;
-    });
-    let newTransaction = gateway.transaction.sale(
+    const checkoutSummary = await buildCheckoutSummary(cart);
+    if (checkoutSummary.error) {
+      return res
+        .status(checkoutSummary.error.status)
+        .send(checkoutSummary.error.body);
+    }
+
+    const stockReservation = await reserveStock(
+      checkoutSummary.products,
+      checkoutSummary.requestedQuantities
+    );
+    if (stockReservation?.error) {
+      return res
+        .status(stockReservation.error.status)
+        .send(stockReservation.error.body);
+    }
+
+    gateway.transaction.sale(
       {
-        amount: total,
+        amount: checkoutSummary.total,
         paymentMethodNonce: nonce,
         options: {
           submitForSettlement: true,
         },
       },
-      function (error, result) {
+      async function (error, result) {
         if (result) {
-          const order = new orderModel({
-            products: cart,
+          await new orderModel({
+            products: checkoutSummary.expandedProductIds,
             payment: result,
             buyer: req.user._id,
           }).save();
           res.json({ ok: true });
         } else {
+          await releaseReservedStock(stockReservation.reserved);
           res.status(500).send(error);
         }
       }
     );
   } catch (error) {
     console.log(error);
+    res.status(500).send({
+      success: false,
+      message: "Error while processing payment",
+      error,
+    });
   }
 };
