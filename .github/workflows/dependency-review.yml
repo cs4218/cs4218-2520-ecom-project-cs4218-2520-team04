@@ -10,12 +10,12 @@ permissions:
 
 jobs:
   dependency-review:
-    name: Dependency Review
+    name: OSV Dependency Scan
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
