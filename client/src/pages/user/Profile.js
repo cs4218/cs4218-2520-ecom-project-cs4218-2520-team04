@@ -5,6 +5,9 @@ import { useAuth } from "../../context/auth";
 import toast from "react-hot-toast";
 import axios from "axios";
 
+const PASSWORD_POLICY_HINT =
+  "Use at least 10 characters with uppercase, lowercase, number, and special characters.";
+
 const Profile = () => {
   //context
   const [auth, setAuth] = useAuth();
@@ -105,6 +108,9 @@ const Profile = () => {
                     className="form-control"
                     id="exampleInputPassword1"
                     placeholder="Enter Your Password"
+                    minLength={10}
+                    title={PASSWORD_POLICY_HINT}
+                    autoComplete="new-password"
                   />
                 </div>
 

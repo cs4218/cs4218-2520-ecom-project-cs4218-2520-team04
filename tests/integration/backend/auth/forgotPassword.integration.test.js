@@ -60,7 +60,7 @@ describe("POST /api/v1/auth/forgot-password — Account Recovery Integration", (
     const recoveryUser = {
         email: "recover@test.com",
         answer: "my secret dog",
-        password: "oldpassword"
+        password: "OldPassword1!"
     };
 
     beforeEach(async () => {
@@ -77,7 +77,7 @@ describe("POST /api/v1/auth/forgot-password — Account Recovery Integration", (
     });
 
     test("Successfully authenticates secret answer, hashes new password, and updates DB", async () => {
-        const newPassword = "brandnewpassword";
+        const newPassword = "BrandNewPass1!";
 
         const res = await request(app).post("/api/v1/auth/forgot-password").send({
             email: recoveryUser.email,
@@ -101,7 +101,7 @@ describe("POST /api/v1/auth/forgot-password — Account Recovery Integration", (
         const res = await request(app).post("/api/v1/auth/forgot-password").send({
             email: recoveryUser.email,
             answer: "wrong secret answer",
-            newPassword: "brandnewpassword",
+            newPassword: "BrandNewPass1!",
         });
 
         expect(res.status).toBe(404);
@@ -118,7 +118,7 @@ describe("POST /api/v1/auth/forgot-password — Account Recovery Integration", (
         const res = await request(app).post("/api/v1/auth/forgot-password").send({
             email: "nobody@test.com",
             answer: recoveryUser.answer,
-            newPassword: "brandnewpassword",
+            newPassword: "BrandNewPass1!",
         });
 
         expect(res.status).toBe(404);
@@ -150,7 +150,7 @@ describe("POST /api/v1/auth/forgot-password — Account Recovery Integration", (
         const res = await request(app).post("/api/v1/auth/forgot-password").send({
             email: recoveryUser.email,
             answer: recoveryUser.answer,
-            newPassword: "brandnewpassword",
+            newPassword: "BrandNewPass1!",
         });
 
         expect(res.status).toBe(500);
@@ -160,7 +160,7 @@ describe("POST /api/v1/auth/forgot-password — Account Recovery Integration", (
 
     describe("Security Edge Cases — Forgot Password", () => {
         test("NoSQL Injection via '$ne' operator shouldn't be possible", async () => {
-            const originalPassword = "safepassword";
+            const originalPassword = "SafePassword1!";
             const hashedOldPassword = await hashPassword(originalPassword);
 
             const user = await userModel.create({
@@ -176,13 +176,13 @@ describe("POST /api/v1/auth/forgot-password — Account Recovery Integration", (
             const res = await request(app).post("/api/v1/auth/forgot-password").send({
                 email: "nosql@test.com",
                 answer: { $ne: "I dont know the answer" }, // Malicious Payload
-                newPassword: "hackedpassword",
+                newPassword: "HackedPass1!",
             });
 
             expect(res.status).not.toBe(200);
 
             const unchangedUser = await userModel.findById(user._id);
-            const isCompromised = await comparePassword("hackedpassword", unchangedUser.password);
+            const isCompromised = await comparePassword("HackedPass1!", unchangedUser.password);
 
             expect(isCompromised).toBe(false);
         });

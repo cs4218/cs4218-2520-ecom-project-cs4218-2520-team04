@@ -1,12 +1,29 @@
 import categoryModel from "../models/categoryModel.js";
 import productModel from "../models/productModel.js";
 import slugify from "slugify";
+import {
+  exceedsMaxLength,
+  INPUT_LIMITS,
+  isTextString,
+} from "../helpers/inputValidation.js";
 
 export const createCategoryController = async (req, res) => {
   try {
     const { name } = req.body;
-    if (!name || !name.trim()) {
+    if (name == null) {
       return res.status(400).send({ success: false, message: "Name is required" });
+    }
+    if (!isTextString(name)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid input format. Fields must be text strings.",
+      });
+    }
+    if (!name.trim()) {
+      return res.status(400).send({ success: false, message: "Name is required" });
+    }
+    if (exceedsMaxLength(name, INPUT_LIMITS.categoryName)) {
+      return res.status(400).send({ success: false, message: "Name is too long" });
     }
     const trimmedName = name.trim();
     const existingCategory = await categoryModel.findOne({ name: trimmedName });
@@ -41,8 +58,20 @@ export const updateCategoryController = async (req, res) => {
     const { name } = req.body;
     const { id } = req.params;
 
-    if (!name || !name.trim()) {
+    if (name == null) {
       return res.status(400).send({ success: false, message: "Name is required" });
+    }
+    if (!isTextString(name)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid input format. Fields must be text strings.",
+      });
+    }
+    if (!name.trim()) {
+      return res.status(400).send({ success: false, message: "Name is required" });
+    }
+    if (exceedsMaxLength(name, INPUT_LIMITS.categoryName)) {
+      return res.status(400).send({ success: false, message: "Name is too long" });
     }
 
     const trimmedName = name.trim();

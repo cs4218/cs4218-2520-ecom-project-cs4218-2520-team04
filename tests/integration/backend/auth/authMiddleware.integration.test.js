@@ -133,7 +133,7 @@ describe("Full Auth Lifecycle via HTTP — Register → Login → Access Protect
         const credentials = {
             name: "Integration Admin",
             email: "flow@test.com",
-            password: "securepassword",
+            password: "SecurePass1!",
             phone: "12345678",
             address: "1 Flow Street",
             answer: "flow answer"

@@ -4,6 +4,10 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "../../styles/AuthStyles.css";
+
+const PASSWORD_POLICY_HINT =
+  "Use at least 10 characters with uppercase, lowercase, number, and special characters.";
+
 const Register = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -83,6 +87,9 @@ const Register = () => {
               className="form-control"
               id="exampleInputPassword1"
               placeholder="Enter Your Password"
+              minLength={10}
+              title={PASSWORD_POLICY_HINT}
+              autoComplete="new-password"
               required
             />
           </div>

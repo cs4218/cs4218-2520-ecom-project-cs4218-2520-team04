@@ -71,7 +71,7 @@ describe("Register Flow Integration", () => {
 
         await userEvent.type(screen.getByPlaceholderText("Enter Your Name"), "John Doe");
         await userEvent.type(screen.getByPlaceholderText("Enter Your Email"), "john@test.com");
-        await userEvent.type(screen.getByPlaceholderText("Enter Your Password"), "pass123");
+        await userEvent.type(screen.getByPlaceholderText("Enter Your Password"), "Pass1234!");
         await userEvent.type(screen.getByPlaceholderText("Enter Your Phone"), "12345678");
         await userEvent.type(screen.getByPlaceholderText("Enter Your Address"), "123 St");
         await userEvent.type(screen.getByPlaceholderText("Enter Your DOB"), "2000-01-01");
@@ -109,7 +109,7 @@ describe("Register Flow Integration", () => {
         // Fill ALL required fields so the form actually submits
         await userEvent.type(screen.getByPlaceholderText("Enter Your Name"), "Test User");
         await userEvent.type(screen.getByPlaceholderText("Enter Your Email"), "existing@test.com");
-        await userEvent.type(screen.getByPlaceholderText("Enter Your Password"), "pass123");
+        await userEvent.type(screen.getByPlaceholderText("Enter Your Password"), "Pass1234!");
         await userEvent.type(screen.getByPlaceholderText("Enter Your Phone"), "12345678");
         await userEvent.type(screen.getByPlaceholderText("Enter Your Address"), "123 St");
         await userEvent.type(screen.getByPlaceholderText("Enter Your DOB"), "2000-01-01");
@@ -253,7 +253,7 @@ describe("Login Flow - API Rejections & Network Failures", () => {
         );
 
         await userEvent.type(screen.getByPlaceholderText("Enter Your Email"), "buggy@test.com");
-        await userEvent.type(screen.getByPlaceholderText("Enter Your Password"), "pass123");
+        await userEvent.type(screen.getByPlaceholderText("Enter Your Password"), "Pass1234!");
         await userEvent.click(screen.getByRole("button", { name: /login/i }));
 
         await waitFor(() => {

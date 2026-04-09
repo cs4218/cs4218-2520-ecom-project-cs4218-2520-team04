@@ -22,6 +22,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import userModel from "../../../../models/userModel.js";
 import { loginController } from "../../../../controllers/authController.js";
 import { hashPassword } from "../../../../helpers/authHelper.js";
+import { resetLoginProtectionState } from "../../../../helpers/loginProtection.js";
 
 process.env.JWT_SECRET = "test-jwt-secret-integration";
 
@@ -56,6 +57,7 @@ afterAll(async () => {
 
 afterEach(async () => {
     jest.restoreAllMocks();
+    resetLoginProtectionState();
     await userModel.deleteMany({});
 });
 
@@ -65,7 +67,7 @@ describe("POST /api/v1/auth/login — User Authentication Integration", () => {
     let testUserId;
     const loginUser = {
         email: "login@example.com",
-        password: "mypassword123"
+        password: "MyPassword1!"
     };
 
     beforeEach(async () => {
@@ -102,45 +104,68 @@ describe("POST /api/v1/auth/login — User Authentication Integration", () => {
         expect(decodedToken._id).toBe(testUserId);
     });
 
-    test("Returns 200 (false success) when the password does not match (bcrypt compare fails)", async () => {
+    test("Returns 401 (false success) when the password does not match (bcrypt compare fails)", async () => {
         const res = await request(app).post("/api/v1/auth/login").send({
             email: loginUser.email,
-            password: "wrongpassword",
+            password: "WrongPass1!",
         });
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(401);
         expect(res.body.success).toBe(false);
-        expect(res.body.message).toBe("Invalid password");
+        expect(res.body.message).toBe("Invalid email or password");
         expect(res.body.token).toBeUndefined();
     });
 
-    test("Returns 404 when attempting to login with an unregistered email", async () => {
+    test("Returns the same generic message when attempting to login with an unregistered email", async () => {
         const res = await request(app).post("/api/v1/auth/login").send({
             email: "nobody@example.com",
-            password: "password123",
+            password: "WrongPass1!",
         });
 
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(401);
         expect(res.body.success).toBe(false);
-        expect(res.body.message).toBe("Email is not registered");
+        expect(res.body.message).toBe("Invalid email or password");
     });
 
     describe("Input Validation Edge Cases", () => {
         const invalidInputs = [
             { payload: { email: "login@example.com" }, missing: "password" },
-            { payload: { password: "mypassword123" }, missing: "email" },
+            { payload: { password: "MyPassword1!" }, missing: "email" },
             { payload: {}, missing: "both" }
         ];
 
-        test.each(invalidInputs)("Returns 404 when $missing is missing from the request", async ({ payload }) => {
+        test.each(invalidInputs)("Returns 400 when $missing is missing from the request", async ({ payload }) => {
             const res = await request(app)
                 .post("/api/v1/auth/login")
                 .send(payload);
 
-            expect(res.status).toBe(404);
+            expect(res.status).toBe(400);
             expect(res.body.success).toBe(false);
             expect(res.body.message).toBe("Invalid email or password");
         });
+    });
+
+    test("Returns 429 after repeated failed logins from the same IP", async () => {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            await request(app)
+                .post("/api/v1/auth/login")
+                .send({
+                    email: `nobody-${attempt}@example.com`,
+                    password: "WrongPass1!",
+                });
+        }
+
+        const res = await request(app)
+            .post("/api/v1/auth/login")
+            .send({
+                email: "another@example.com",
+                password: "WrongPass1!",
+            });
+
+        expect(res.status).toBe(429);
+        expect(res.body.success).toBe(false);
+        expect(res.body.message).toBe("Too many failed login attempts. Please try again later.");
+        expect(res.headers["retry-after"]).toBeDefined();
     });
 
     test("Returns 500 when an internal server error occurs during login", async () => {

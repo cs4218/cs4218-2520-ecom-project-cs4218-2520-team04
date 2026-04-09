@@ -22,6 +22,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 
 import authRoutes from "../../../../routes/authRoute.js";
 import userModel from "../../../../models/userModel.js";
+import { PASSWORD_POLICY_MESSAGE } from "../../../../helpers/passwordPolicy.js";
 
 process.env.JWT_SECRET = "test-jwt-secret-integration";
 
@@ -86,7 +87,7 @@ describe("Profile update: full HTTP stack (requireSignIn → updateProfileContro
     const user = await userModel.create({
       name: "Old Name",
       email: "old@example.com",
-      password: "oldpassword123",
+      password: "OldPassword1!",
       phone: "90000000",
       address: "Old Addr",
       answer: "x",
@@ -101,7 +102,7 @@ describe("Profile update: full HTTP stack (requireSignIn → updateProfileContro
       .send({
         name: "New Name",
         email: "should-not-change@example.com", // controller ignores email
-        password: "newpass123",
+        password: "NewPass123!",
         phone: "98887777",
         address: "New Addr",
       });
@@ -131,15 +132,15 @@ describe("Profile update: full HTTP stack (requireSignIn → updateProfileContro
     expect(updated.email).toBe("old@example.com");
 
     // Password should be updated + hashed (should not equal old plaintext)
-    expect(updated.password).not.toBe("oldpassword123");
-    expect(updated.password).not.toBe("newpass123");
+    expect(updated.password).not.toBe("OldPassword1!");
+    expect(updated.password).not.toBe("NewPass123!");
   });
 
-  test("rejects invalid password (<6 chars) with 400 and does not persist changes", async () => {
+  test("rejects a weak password with 400 and does not persist changes", async () => {
     const user = await userModel.create({
       name: "Old Name",
       email: "old@example.com",
-      password: "oldpassword123",
+      password: "OldPassword1!",
       phone: "90000000",
       address: "Old Addr",
       answer: "x",
@@ -160,14 +161,14 @@ describe("Profile update: full HTTP stack (requireSignIn → updateProfileContro
     expect(res.body).toEqual(
       expect.objectContaining({
         success: false,
-        message: "Password must be at least 6 characters long",
+        message: PASSWORD_POLICY_MESSAGE,
       })
     );
 
     // Verify DB unchanged
     const after = await userModel.findById(user._id);
     expect(after.name).toBe("Old Name");
-    expect(after.password).toBe("oldpassword123"); // unchanged because update aborted early
+    expect(after.password).toBe("OldPassword1!"); // unchanged because update aborted early
   });
 
   test("returns 404 when token is valid but user does not exist", async () => {
@@ -192,7 +193,7 @@ describe("Profile update: full HTTP stack (requireSignIn → updateProfileContro
     const user = await userModel.create({
       name: "Same Name",
       email: "same@example.com",
-      password: "oldpassword123",
+      password: "OldPassword1!",
       phone: "90000000",
       address: "Same Addr",
       answer: "x",

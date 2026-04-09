@@ -19,6 +19,8 @@ import bcrypt from "bcrypt";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import authRoute from "../../../../routes/authRoute.js";
 import userModel from "../../../../models/userModel.js";
+import { resetLoginProtectionState } from "../../../../helpers/loginProtection.js";
+import { PASSWORD_POLICY_MESSAGE } from "../../../../helpers/passwordPolicy.js";
 
 process.env.JWT_SECRET = "test-jwt-secret-usermodel";
 
@@ -49,6 +51,7 @@ afterAll(async () => {
 
 afterEach(async () => {
   jest.restoreAllMocks();
+  resetLoginProtectionState();
   await userModel.deleteMany({});
 });
 
@@ -58,7 +61,7 @@ describe("POST /api/v1/auth/register — userModel schema validation + password 
   const validUser = {
     name: "Alice",
     email: "alice@test.com",
-    password: "secret123",
+    password: "Secret123!",
     phone: "91234567",
     address: "1 Test St",
     answer: "blue",
@@ -101,6 +104,15 @@ describe("POST /api/v1/auth/register — userModel schema validation + password 
       .send({ ...validUser, password: "" });
     expect(res.status).toBe(400);
     expect(res.body.message).toBe("Password is required");
+  });
+
+  test("returns 400 when password does not meet the minimum strength policy", async () => {
+    const res = await request(app)
+      .post("/api/v1/auth/register")
+      .send({ ...validUser, password: "weak" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe(PASSWORD_POLICY_MESSAGE);
   });
 
   test("returns success:false when email is already registered (duplicate detection via userModel)", async () => {
@@ -150,7 +162,7 @@ describe("POST /api/v1/auth/login — comparePassword helper + JWT generation", 
   });
 
   test("returns success:false on wrong password (comparePassword returns false)", async () => {
-    const hashedPw = await bcrypt.hash("correctpassword", 10);
+    const hashedPw = await bcrypt.hash("CorrectPass1!", 10);
     await userModel.create({
       name: "Carol",
       email: "carol@test.com",
@@ -162,25 +174,25 @@ describe("POST /api/v1/auth/login — comparePassword helper + JWT generation", 
 
     const res = await request(app)
       .post("/api/v1/auth/login")
-      .send({ email: "carol@test.com", password: "wrongpassword" });
+      .send({ email: "carol@test.com", password: "WrongPass1!" });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
-    expect(res.body.message).toBe("Invalid password");
+    expect(res.body.message).toBe("Invalid email or password");
   });
 
-  test("returns 404 when email is not registered", async () => {
+  test("returns the same generic error when email is not registered", async () => {
     const res = await request(app)
       .post("/api/v1/auth/login")
-      .send({ email: "nobody@test.com", password: "pass" });
+      .send({ email: "nobody@test.com", password: "WrongPass1!" });
 
-    expect(res.status).toBe(404);
-    expect(res.body.message).toBe("Email is not registered");
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe("Invalid email or password");
   });
 
   test("login response includes role field from userModel", async () => {
     // Integration: role stored in userModel is returned in the login response
-    const hashedPw = await bcrypt.hash("adminpass", 10);
+    const hashedPw = await bcrypt.hash("AdminPass1!", 10);
     await userModel.create({
       name: "Dave Admin",
       email: "dave@test.com",
@@ -193,7 +205,7 @@ describe("POST /api/v1/auth/login — comparePassword helper + JWT generation", 
 
     const res = await request(app)
       .post("/api/v1/auth/login")
-      .send({ email: "dave@test.com", password: "adminpass" });
+      .send({ email: "dave@test.com", password: "AdminPass1!" });
 
     expect(res.status).toBe(200);
     expect(res.body.user.role).toBe(1);

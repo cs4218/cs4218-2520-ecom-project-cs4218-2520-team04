@@ -338,8 +338,10 @@ describe("POST /api/v1/product/braintree/payment", () => {
           .set("Authorization", shopperToken)
           .send({
             nonce: "nonce-fail",
-            cart: [{ _id: product._id.toString(), price: product.price }],
+            cart: [{ _id: product._id.toString(), price: 1, quantity: 1 }],
           });
+
+        const refreshedProduct = await productModel.findById(product._id);
 
         // Assert
         expect(res.status).toBe(500);
@@ -347,6 +349,11 @@ describe("POST /api/v1/product/braintree/payment", () => {
         expect(await orderModel.countDocuments({})).toBe(
           orderCountBeforeRequest,
         );
+        expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
+          expect.objectContaining({ amount: 80 }),
+          expect.any(Function),
+        );
+        expect(refreshedProduct.quantity).toBe(7);
       });
     });
   });
@@ -407,8 +414,8 @@ describe("POST /api/v1/product/braintree/payment", () => {
         // Flow: seed shopper, JWT, and products -> mock successful sale -> POST payment -> wait for saved order -> assert response and persisted order fields.
         // Arrange
         const cart = [
-          { _id: firstProduct._id.toString(), price: firstProduct.price },
-          { _id: secondProduct._id.toString(), price: secondProduct.price },
+          { _id: firstProduct._id.toString(), price: 0.01, quantity: 1 },
+          { _id: secondProduct._id.toString(), price: 0.01, quantity: 1 },
         ];
         const resultObj = { transaction: { id: "txn-1", status: "submitted" } };
         const orderCountBeforeRequest = await orderModel.countDocuments({});
@@ -425,10 +432,16 @@ describe("POST /api/v1/product/braintree/payment", () => {
             cart,
           });
         const savedOrder = await waitForOrderByBuyer(shopper._id);
+        const refreshedFirstProduct = await productModel.findById(firstProduct._id);
+        const refreshedSecondProduct = await productModel.findById(secondProduct._id);
 
         // Assert
         expect(res.status).toBe(200);
         expect(res.body).toEqual({ ok: true });
+        expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
+          expect.objectContaining({ amount: 25 }),
+          expect.any(Function),
+        );
         expect(await orderModel.countDocuments({})).toBe(
           orderCountBeforeRequest + 1,
         );
@@ -438,6 +451,31 @@ describe("POST /api/v1/product/braintree/payment", () => {
         ).toEqual([firstProduct._id.toString(), secondProduct._id.toString()]);
         expect(savedOrder.payment).toEqual(resultObj);
         expect(savedOrder.buyer.toString()).toBe(shopper._id.toString());
+        expect(refreshedFirstProduct.quantity).toBe(2);
+        expect(refreshedSecondProduct.quantity).toBe(4);
+      });
+
+      test("returns 409 when the client tampers with quantity beyond available stock", async () => {
+        const orderCountBeforeRequest = await orderModel.countDocuments({});
+
+        const res = await request(app)
+          .post("/api/v1/product/braintree/payment")
+          .set("Authorization", shopperToken)
+          .send({
+            nonce: "nonce-oversold",
+            cart: [{ _id: firstProduct._id.toString(), price: 10, quantity: 99 }],
+          });
+
+        const refreshedFirstProduct = await productModel.findById(firstProduct._id);
+
+        expect(res.status).toBe(409);
+        expect(res.body).toEqual({
+          success: false,
+          message: "One or more products are out of stock",
+        });
+        expect(await orderModel.countDocuments({})).toBe(orderCountBeforeRequest);
+        expect(refreshedFirstProduct.quantity).toBe(3);
+        expect(getMockBraintreeGateway().transaction.sale).not.toHaveBeenCalled();
       });
     });
   });
@@ -503,8 +541,8 @@ describe("Complete Braintree route flow - token to payment", () => {
       transaction: { id: "txn-flow", status: "submitted" },
     };
     const cart = [
-      { _id: firstProduct._id.toString(), price: firstProduct.price },
-      { _id: secondProduct._id.toString(), price: secondProduct.price },
+      { _id: firstProduct._id.toString(), price: 1, quantity: 1 },
+      { _id: secondProduct._id.toString(), price: 1, quantity: 1 },
     ];
     const orderCountBeforeRequest = await orderModel.countDocuments({});
 
@@ -531,12 +569,18 @@ describe("Complete Braintree route flow - token to payment", () => {
         cart,
       });
     const savedOrder = await waitForOrderByBuyer(shopper._id);
+    const refreshedFirstProduct = await productModel.findById(firstProduct._id);
+    const refreshedSecondProduct = await productModel.findById(secondProduct._id);
 
     // Assert
     expect(tokenRes.status).toBe(200);
     expect(tokenRes.body).toEqual(tokenResponse);
     expect(paymentRes.status).toBe(200);
     expect(paymentRes.body).toEqual({ ok: true });
+    expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 25 }),
+      expect.any(Function),
+    );
     expect(await orderModel.countDocuments({})).toBe(
       orderCountBeforeRequest + 1,
     );
@@ -546,6 +590,8 @@ describe("Complete Braintree route flow - token to payment", () => {
     ).toEqual([firstProduct._id.toString(), secondProduct._id.toString()]);
     expect(savedOrder.payment).toEqual(paymentResponse);
     expect(savedOrder.buyer.toString()).toBe(shopper._id.toString());
+    expect(refreshedFirstProduct.quantity).toBe(2);
+    expect(refreshedSecondProduct.quantity).toBe(6);
   });
 });
 

@@ -56,7 +56,7 @@ test.describe.serial("UI: Update Profile → Persist → Refresh page", () => {
 
     // Update fields
     await nameInput(page).fill(updatedUser.name);
-    await passwordInput(page).fill("newpass123"); // valid length
+    await passwordInput(page).fill("NewPass123!"); // valid policy
     await phoneInput(page).fill(updatedUser.phone);
     await addressInput(page).fill(updatedUser.address);
 
@@ -92,7 +92,7 @@ test.describe.serial("UI: Update Profile → Persist → Refresh page", () => {
         await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ error: "Password must be at least 6 characters long" }),
+        body: JSON.stringify({ error: "Password must be at least 10 characters long and include uppercase, lowercase, number, and special characters." }),
         });
     });
 
@@ -105,7 +105,7 @@ test.describe.serial("UI: Update Profile → Persist → Refresh page", () => {
     await updateButton(page).click();
 
     // Error feedback
-    await expect(page.getByText("Password must be at least 6 characters long")).toBeVisible();
+    await expect(page.getByText("Password must be at least 10 characters long and include uppercase, lowercase, number, and special characters.")).toBeVisible();
 
     // Reload and ensure original values still there (update rejected)
     await page.reload();

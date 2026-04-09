@@ -18,6 +18,7 @@
     "test:integration": "node --no-deprecation node_modules/jest/bin/jest.js --config=jest.integration.config.js",
     "test:integration:backend": "node --no-deprecation node_modules/jest/bin/jest.js --config=jest.integration.backend.config.js",
     "test:integration:frontend": "node --no-deprecation node_modules/jest/bin/jest.js --config=jest.integration.frontend.config.js",
+    "test:security": "node --no-deprecation node_modules/jest/bin/jest.js --config=jest.security.config.js",
     "test:sonar": "node --experimental-vm-modules --no-deprecation node_modules/jest/bin/jest.js --config jest.sonar.config.js --coverage",
     "test:ui": "playwright test",
     "test:ui:report": "playwright show-report"

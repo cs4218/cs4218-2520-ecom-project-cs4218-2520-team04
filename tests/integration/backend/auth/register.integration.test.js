@@ -20,7 +20,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import userModel from "../../../../models/userModel.js";
 import { registerController } from "../../../../controllers/authController.js";
 import { hashPassword, comparePassword } from "../../../../helpers/authHelper.js";
-import bcrypt from "bcrypt";
+import { PASSWORD_POLICY_MESSAGE } from "../../../../helpers/passwordPolicy.js";
 
 // Silence console noise during tests
 beforeAll(() => {
@@ -63,7 +63,7 @@ describe("POST /api/v1/auth/register — User Registration Integration", () => {
     const validUser = {
         name: "John Doe",
         email: "john@example.com",
-        password: "securepassword",
+        password: "SecurePass1!",
         phone: "12345678",
         address: "123 Main St",
         answer: "blue",
@@ -135,5 +135,15 @@ describe("POST /api/v1/auth/register — User Registration Integration", () => {
         expect(res.status).toBe(500);
         expect(res.body.success).toBe(false);
         expect(res.body.message).toBe("Error in registration");
+    });
+
+    test("Returns 400 when password does not meet the minimum strength policy", async () => {
+        const res = await request(app)
+            .post("/api/v1/auth/register")
+            .send({ ...validUser, password: "weak" });
+
+        expect(res.status).toBe(400);
+        expect(res.body.success).toBe(false);
+        expect(res.body.message).toBe(PASSWORD_POLICY_MESSAGE);
     });
 });

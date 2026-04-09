@@ -11,6 +11,8 @@ getAllOrdersController,
 import orderModel from "../models/orderModel.js";
 import userModel from "../models/userModel.js";
 import { hashPassword, comparePassword } from "../helpers/authHelper.js";
+import { resetLoginProtectionState } from "../helpers/loginProtection.js";
+import { PASSWORD_POLICY_MESSAGE } from "../helpers/passwordPolicy.js";
 import JWT from "jsonwebtoken";
 
 // Mock the dependencies
@@ -24,21 +26,23 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
     let testReq;
 
     beforeEach(() => {
-        req = { body: {}, params: {}, user: {} };
+        req = { body: {}, params: {}, user: {}, headers: {} };
         testReq = {
             name: "John Doe",
             email: "john@example.com",
-            password: "password123",
+            password: "Password123!",
             phone: "123456789",
             address: "123 Street",
             answer: "blue",
         };
         res = {
             status: jest.fn().mockReturnThis(),
+            set: jest.fn().mockReturnThis(),
             send: jest.fn().mockReturnThis(),
             json: jest.fn().mockReturnThis(),
         };
         jest.clearAllMocks();
+        resetLoginProtectionState();
         jest.spyOn(console, "log").mockImplementation(() => {});
     });
 
@@ -127,6 +131,24 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
             }));
         });
 
+        it("should detect an existing mixed-case email without lowercasing stored data", async () => {
+            req.body = {
+                ...testReq,
+                email: "john@example.com",
+            };
+            userModel.findOne.mockResolvedValue({ email: "John@Example.com" });
+
+            await registerController(req, res);
+
+            expect(userModel.findOne).toHaveBeenCalledWith({
+                email: {
+                    $regex: "^john@example\\.com$",
+                    $options: "i",
+                },
+            });
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
+
         it("should return 500 on server error", async () => {
             req.body = testReq;
             userModel.findOne.mockRejectedValue(new Error("DB Error"));
@@ -141,7 +163,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
         it("should return 404 if email or password is missing", async () => {
             req.body = { email: "", password: "" };
             await loginController(req, res);
-            expect(res.status).toHaveBeenCalledWith(404);
+            expect(res.status).toHaveBeenCalledWith(400);
             expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
                 message: "Invalid email or password",
             }));
@@ -201,9 +223,9 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
 
             await loginController(req, res);
 
-            expect(res.status).toHaveBeenCalledWith(404);
+            expect(res.status).toHaveBeenCalledWith(401);
             expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
-                message: "Email is not registered",
+                message: "Invalid email or password",
             }));
         });
 
@@ -221,9 +243,26 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
 
             await loginController(req, res);
 
-            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.status).toHaveBeenCalledWith(401);
             expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
-                message: "Invalid password",
+                message: "Invalid email or password",
+            }));
+        });
+
+        it("should throttle repeated failed login attempts for the same account and IP", async () => {
+            req.body = { email: "wrong@test.com", password: "123" };
+            userModel.findOne.mockResolvedValue(null);
+
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+                await loginController(req, res);
+            }
+
+            await loginController(req, res);
+
+            expect(res.set).toHaveBeenCalledWith("Retry-After", expect.any(String));
+            expect(res.status).toHaveBeenLastCalledWith(429);
+            expect(res.send).toHaveBeenLastCalledWith(expect.objectContaining({
+                message: "Too many failed login attempts. Please try again later.",
             }));
         });
 
@@ -237,13 +276,38 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
                 message: "Error in login",
             }));
         })
+
+        it("should login with a mixed-case stored email using a lowercase lookup key", async () => {
+            req.body = { email: "john@example.com", password: "password123" };
+            const mockUser = {
+                _id: "123",
+                name: "John",
+                email: "John@Example.com",
+                password: "hashed_password",
+                role: 0
+            };
+
+            userModel.findOne.mockResolvedValue(mockUser);
+            comparePassword.mockResolvedValue(true);
+            JWT.sign.mockReturnValue("mock_token");
+
+            await loginController(req, res);
+
+            expect(userModel.findOne).toHaveBeenCalledWith({
+                email: {
+                    $regex: "^john@example\\.com$",
+                    $options: "i",
+                },
+            });
+            expect(res.status).toHaveBeenCalledWith(200);
+        });
     });
 
     // --- FORGOT PASSWORD TESTS ---
     // Written with the aid of Gemini AI
     describe("forgotPasswordController", () => { // Mervyn Teo Zi Yan, A0273039A
         it("should reset password successfully", async () => {
-            req.body = { email: "test@test.com", answer: "blue", newPassword: "new123" };
+            req.body = { email: "test@test.com", answer: "blue", newPassword: "NewPass123!" };
             userModel.findOne.mockResolvedValue({ _id: "user123" });
             hashPassword.mockResolvedValue("new_hash");
 
@@ -257,7 +321,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
         });
 
         it("should return 404 for wrong email or answer", async () => {
-            req.body = { email: "test@test.com", answer: "blue", newPassword: "new123" };
+            req.body = { email: "test@test.com", answer: "blue", newPassword: "NewPass123!" };
         userModel.findOne.mockResolvedValue(null);
             await forgotPasswordController(req, res);
 
@@ -268,7 +332,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
         });
 
         it("should return 400 if email is missing", async () => {
-            req.body = { answer: "blue", newPassword: "new123" };
+            req.body = { answer: "blue", newPassword: "NewPass123!" };
             await forgotPasswordController(req, res);
             expect(res.status).toHaveBeenCalledWith(400);
             expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
@@ -277,7 +341,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
         });
 
         it("should return 400 if answer is missing", async () => {
-            req.body = { email: "test@test.com", newPassword: "new123" };
+            req.body = { email: "test@test.com", newPassword: "NewPass123!" };
             await forgotPasswordController(req, res);
             expect(res.status).toHaveBeenCalledWith(400);
             expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
@@ -295,7 +359,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
         });
 
         it("should return 500 on server error", async () => {
-            req.body = { email: "test@test.com", answer: "blue", newPassword: "new123" };
+            req.body = { email: "test@test.com", answer: "blue", newPassword: "NewPass123!" };
             userModel.findOne.mockRejectedValue(new Error("DB Error"));
 
             await forgotPasswordController(req, res);
@@ -303,6 +367,35 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
             expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
                 message: "Something went wrong",
             }));
+        });
+
+        it("should return 400 for a weak reset password", async () => {
+            req.body = { email: "test@test.com", answer: "blue", newPassword: "weak" };
+
+            await forgotPasswordController(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
+                message: PASSWORD_POLICY_MESSAGE,
+            }));
+            expect(userModel.findOne).not.toHaveBeenCalled();
+        });
+
+        it("should find forgot-password users regardless of stored email casing", async () => {
+            req.body = { email: "test@test.com", answer: "blue", newPassword: "NewPass123!" };
+            userModel.findOne.mockResolvedValue({ _id: "user123" });
+            hashPassword.mockResolvedValue("new_hash");
+
+            await forgotPasswordController(req, res);
+
+            expect(userModel.findOne).toHaveBeenCalledWith({
+                email: {
+                    $regex: "^test@test\\.com$",
+                    $options: "i",
+                },
+                answer: "blue",
+            });
+            expect(res.status).toHaveBeenCalledWith(200);
         });
     });
 
@@ -380,7 +473,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
             );
         });
 
-        it("should return 400 if password exists and is < 6 chars", async () => {
+        it("should return 400 if password is weaker than the minimum policy", async () => {
             req.user = { _id: "user123" };
             req.body = { name: "New", password: "123", phone: "1", address: "A" };
 
@@ -398,7 +491,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
             expect(res.send).toHaveBeenCalledWith(
                 expect.objectContaining({
                     success: false,
-                    message: "Password must be at least 6 characters long",
+                    message: PASSWORD_POLICY_MESSAGE,
                 })
             );
             expect(hashPassword).not.toHaveBeenCalled();
@@ -464,7 +557,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
             req.user = { _id: "user123" };
             req.body = {
                 name: "New Name",
-                password: "newpass123",
+                password: "NewPass123!",
                 phone: "111",
                 address: "NewAddr",
             };
@@ -491,7 +584,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
 
             await updateProfileController(req, res);
 
-            expect(hashPassword).toHaveBeenCalledWith("newpass123");
+            expect(hashPassword).toHaveBeenCalledWith("NewPass123!");
 
             expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(
                 "user123",
@@ -579,7 +672,7 @@ describe("Auth Controller Unit Tests", () => { // Mervyn Teo Zi Yan, A0273039A
         });
 
         it("when email missing: sends 400 (and does not reset password)", async () => {
-            req.body = { email: "", answer: "blue", newPassword: "new123" };
+            req.body = { email: "", answer: "blue", newPassword: "NewPass123!" };
 
             await forgotPasswordController(req, res);
 

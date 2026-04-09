@@ -120,7 +120,7 @@ describe("Profile (unit)", () => {
     render(<Profile />);
 
     setInput("Enter Your Name", "New Name");
-    setInput("Enter Your Password", "newpass");
+    setInput("Enter Your Password", "Newpass1!");
     setInput("Enter Your Phone", "98887777");
     setInput("Enter Your Address", "New Addr");
 
@@ -132,7 +132,7 @@ describe("Profile (unit)", () => {
     expect(axios.put).toHaveBeenCalledWith("/api/v1/auth/profile", {
       name: "New Name",
       email: "old@example.com",
-      password: "newpass",
+      password: "Newpass1!",
       phone: "98887777",
       address: "New Addr",
     });

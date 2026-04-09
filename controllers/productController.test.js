@@ -1354,14 +1354,23 @@ describe("braintreePaymentController", () => {
     test("should process payment, save order, and return ok true", async () => {
       // Arrange
       const cart = [
-        { _id: "p1", price: 10 },
-        { _id: "p2", price: 15 },
+        { _id: "p1", price: 1 },
+        { _id: "p2", price: 2 },
       ];
       const nonce = "nonce-123";
       const buyerId = "buyer123";
       const resultObj = { transaction: { id: "txn-1" } };
       const saveMock = jest.fn().mockResolvedValue({ _id: "order1" });
       orderModel.mockImplementation(() => ({ save: saveMock }));
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([
+          { _id: "p1", price: 10, quantity: 5 },
+          { _id: "p2", price: 15, quantity: 5 },
+        ]),
+      });
+      productModel.findOneAndUpdate
+        .mockResolvedValueOnce({ _id: "p1", quantity: 4 })
+        .mockResolvedValueOnce({ _id: "p2", quantity: 4 });
       req = mockReq({
         body: { nonce, cart },
         user: { _id: buyerId },
@@ -1383,7 +1392,7 @@ describe("braintreePaymentController", () => {
         expect.any(Function),
       );
       expect(orderModel).toHaveBeenCalledWith({
-        products: cart,
+        products: ["p1", "p2"],
         payment: resultObj,
         buyer: buyerId,
       });
@@ -1394,12 +1403,23 @@ describe("braintreePaymentController", () => {
     test("should compute total amount correctly for multi-item cart", async () => {
       // Arrange
       const cart = [
-        { _id: "p1", price: 29.99 },
-        { _id: "p2", price: 50 },
-        { _id: "p3", price: 20.01 },
+        { _id: "p1", price: 0.01, quantity: 2 },
+        { _id: "p2", price: 1, quantity: 1 },
+        { _id: "p3", price: 999, quantity: 3 },
       ];
       const saveMock = jest.fn().mockResolvedValue({ _id: "order2" });
       orderModel.mockImplementation(() => ({ save: saveMock }));
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([
+          { _id: "p1", price: 29.99, quantity: 5 },
+          { _id: "p2", price: 50, quantity: 5 },
+          { _id: "p3", price: 20.01, quantity: 5 },
+        ]),
+      });
+      productModel.findOneAndUpdate
+        .mockResolvedValueOnce({ _id: "p1", quantity: 3 })
+        .mockResolvedValueOnce({ _id: "p2", quantity: 4 })
+        .mockResolvedValueOnce({ _id: "p3", quantity: 2 });
       req = mockReq({
         body: { nonce: "nonce-456", cart },
         user: { _id: "buyer456" },
@@ -1413,7 +1433,33 @@ describe("braintreePaymentController", () => {
 
       // Assert
       expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
-        expect.objectContaining({ amount: 100 }),
+        expect.objectContaining({ amount: 170.01 }),
+        expect.any(Function),
+      );
+      expect(res.json).toHaveBeenCalledWith({ ok: true });
+    });
+
+    test("should reject a tampered cart price and charge the server-calculated amount", async () => {
+      const cart = [{ _id: "p1", price: 0.01 }];
+      orderModel.mockImplementation(() => ({ save: jest.fn().mockResolvedValue({ _id: "order3" }) }));
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([{ _id: "p1", price: 80, quantity: 5 }]),
+      });
+      productModel.findOneAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 4 });
+      req = mockReq({
+        body: { nonce: "nonce-tampered", cart },
+        user: { _id: "buyer789" },
+      });
+      getMockBraintreeGateway().transaction.sale.mockImplementationOnce(
+        (payload, callback) => callback(null, { transaction: { id: "txn-3" } }),
+      );
+
+      await braintreePaymentController(req, res);
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 80 }),
         expect.any(Function),
       );
       expect(res.json).toHaveBeenCalledWith({ ok: true });
@@ -1424,6 +1470,11 @@ describe("braintreePaymentController", () => {
     test("should return 500 when sale callback returns error and no result", async () => {
       // Arrange
       const errorObj = new Error("payment failed");
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([{ _id: "p1", price: 10, quantity: 5 }]),
+      });
+      productModel.findOneAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 4 });
+      productModel.findByIdAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 5 });
       req = mockReq({
         body: { nonce: "nonce-fail", cart: [{ _id: "p1", price: 10 }] },
         user: { _id: "buyer-fail" },
@@ -1434,15 +1485,24 @@ describe("braintreePaymentController", () => {
 
       // Act
       await braintreePaymentController(req, res);
+      await new Promise((resolve) => setImmediate(resolve));
 
       // Assert
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.send).toHaveBeenCalledWith(errorObj);
       expect(orderModel).not.toHaveBeenCalled();
+      expect(productModel.findByIdAndUpdate).toHaveBeenCalledWith("p1", {
+        $inc: { quantity: 1 },
+      });
     });
 
     test("should log when transaction.sale throws synchronously", async () => {
       // Arrange
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([{ _id: "p1", price: 10, quantity: 5 }]),
+      });
+      productModel.findOneAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 4 });
+      productModel.findByIdAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 5 });
       req = mockReq({
         body: { nonce: "nonce-sync-throw", cart: [{ _id: "p1", price: 10 }] },
         user: { _id: "buyer-sync" },
@@ -1456,7 +1516,35 @@ describe("braintreePaymentController", () => {
 
       // Assert
       expect(console.log).toHaveBeenCalled();
-      expect(res.json).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: "Error while processing payment",
+        }),
+      );
+      expect(productModel.findByIdAndUpdate).toHaveBeenCalledWith("p1", {
+        $inc: { quantity: 1 },
+      });
+    });
+
+    test("should return 409 when requested quantity exceeds stock", async () => {
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([{ _id: "p1", price: 10, quantity: 1 }]),
+      });
+      req = mockReq({
+        body: { nonce: "nonce-oos", cart: [{ _id: "p1", quantity: 2 }] },
+        user: { _id: "buyer-oos" },
+      });
+
+      await braintreePaymentController(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.send).toHaveBeenCalledWith({
+        success: false,
+        message: "One or more products are out of stock",
+      });
+      expect(getMockBraintreeGateway().transaction.sale).not.toHaveBeenCalled();
     });
   });
 });
@@ -1541,14 +1629,23 @@ describe("braintreePaymentController", () => {
     test("should process payment, save order, and return ok true", async () => {
       // Arrange
       const cart = [
-        { _id: "p1", price: 10 },
-        { _id: "p2", price: 15 },
+        { _id: "p1", price: 1 },
+        { _id: "p2", price: 2 },
       ];
       const nonce = "nonce-123";
       const buyerId = "buyer123";
       const resultObj = { transaction: { id: "txn-1" } };
       const saveMock = jest.fn().mockResolvedValue({ _id: "order1" });
       orderModel.mockImplementation(() => ({ save: saveMock }));
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([
+          { _id: "p1", price: 10, quantity: 5 },
+          { _id: "p2", price: 15, quantity: 5 },
+        ]),
+      });
+      productModel.findOneAndUpdate
+        .mockResolvedValueOnce({ _id: "p1", quantity: 4 })
+        .mockResolvedValueOnce({ _id: "p2", quantity: 4 });
       req = mockReq({
         body: { nonce, cart },
         user: { _id: buyerId },
@@ -1570,7 +1667,7 @@ describe("braintreePaymentController", () => {
         expect.any(Function),
       );
       expect(orderModel).toHaveBeenCalledWith({
-        products: cart,
+        products: ["p1", "p2"],
         payment: resultObj,
         buyer: buyerId,
       });
@@ -1581,12 +1678,23 @@ describe("braintreePaymentController", () => {
     test("should compute total amount correctly for multi-item cart", async () => {
       // Arrange
       const cart = [
-        { _id: "p1", price: 29.99 },
-        { _id: "p2", price: 50 },
-        { _id: "p3", price: 20.01 },
+        { _id: "p1", price: 0.01, quantity: 2 },
+        { _id: "p2", price: 1, quantity: 1 },
+        { _id: "p3", price: 999, quantity: 3 },
       ];
       const saveMock = jest.fn().mockResolvedValue({ _id: "order2" });
       orderModel.mockImplementation(() => ({ save: saveMock }));
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([
+          { _id: "p1", price: 29.99, quantity: 5 },
+          { _id: "p2", price: 50, quantity: 5 },
+          { _id: "p3", price: 20.01, quantity: 5 },
+        ]),
+      });
+      productModel.findOneAndUpdate
+        .mockResolvedValueOnce({ _id: "p1", quantity: 3 })
+        .mockResolvedValueOnce({ _id: "p2", quantity: 4 })
+        .mockResolvedValueOnce({ _id: "p3", quantity: 2 });
       req = mockReq({
         body: { nonce: "nonce-456", cart },
         user: { _id: "buyer456" },
@@ -1600,7 +1708,7 @@ describe("braintreePaymentController", () => {
 
       // Assert
       expect(getMockBraintreeGateway().transaction.sale).toHaveBeenCalledWith(
-        expect.objectContaining({ amount: 100 }),
+        expect.objectContaining({ amount: 170.01 }),
         expect.any(Function),
       );
       expect(res.json).toHaveBeenCalledWith({ ok: true });
@@ -1611,6 +1719,10 @@ describe("braintreePaymentController", () => {
     test("should return 500 when sale callback returns error and no result", async () => {
       // Arrange
       const errorObj = new Error("payment failed");
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([{ _id: "p1", price: 10, quantity: 5 }]),
+      });
+      productModel.findOneAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 4 });
       req = mockReq({
         body: { nonce: "nonce-fail", cart: [{ _id: "p1", price: 10 }] },
         user: { _id: "buyer-fail" },
@@ -1621,15 +1733,23 @@ describe("braintreePaymentController", () => {
 
       // Act
       await braintreePaymentController(req, res);
+      await new Promise((resolve) => setImmediate(resolve));
 
       // Assert
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.send).toHaveBeenCalledWith(errorObj);
       expect(orderModel).not.toHaveBeenCalled();
+      expect(productModel.findByIdAndUpdate).toHaveBeenCalledWith("p1", {
+        $inc: { quantity: 1 },
+      });
     });
 
     test("should log when transaction.sale throws synchronously", async () => {
       // Arrange
+      productModel.find.mockReturnValue({
+        select: jest.fn().mockResolvedValue([{ _id: "p1", price: 10, quantity: 5 }]),
+      });
+      productModel.findOneAndUpdate.mockResolvedValueOnce({ _id: "p1", quantity: 4 });
       req = mockReq({
         body: { nonce: "nonce-sync-throw", cart: [{ _id: "p1", price: 10 }] },
         user: { _id: "buyer-sync" },
@@ -1643,7 +1763,13 @@ describe("braintreePaymentController", () => {
 
       // Assert
       expect(console.log).toHaveBeenCalled();
-      expect(res.json).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: "Error while processing payment",
+        }),
+      );
     });
   });
 });
