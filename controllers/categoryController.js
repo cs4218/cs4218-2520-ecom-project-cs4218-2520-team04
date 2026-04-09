@@ -10,6 +10,9 @@ import {
 export const createCategoryController = async (req, res) => {
   try {
     const { name } = req.body;
+    if (name == null) {
+      return res.status(400).send({ success: false, message: "Name is required" });
+    }
     if (!isTextString(name)) {
       return res.status(400).send({
         success: false,
@@ -55,6 +58,9 @@ export const updateCategoryController = async (req, res) => {
     const { name } = req.body;
     const { id } = req.params;
 
+    if (name == null) {
+      return res.status(400).send({ success: false, message: "Name is required" });
+    }
     if (!isTextString(name)) {
       return res.status(400).send({
         success: false,

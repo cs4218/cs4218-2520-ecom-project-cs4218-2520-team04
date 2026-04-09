@@ -195,21 +195,18 @@ describe("createCategoryController", () => {
     });
   });
 
-  test("should return 500 when name is a non-string type", async () => {
-    // Arrange — number passes !name guard, then .trim() throws TypeError
+  test("should return 400 when name is a non-string type", async () => {
     req = mockReq({ body: { name: 123 } });
 
     // Act
     await createCategoryController(req, res);
 
     // Assert
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        success: false,
-        message: "Error in Category",
-      }),
-    );
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Invalid input format. Fields must be text strings.",
+    });
   });
 
   test("should trim name before checking existence and saving", async () => {
@@ -347,21 +344,18 @@ describe("updateCategoryController", () => {
     expect(categoryModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
-  test("should return 500 when name is a non-string type", async () => {
-    // Arrange — number passes !name guard, then .trim() throws TypeError
+  test("should return 400 when name is a non-string type", async () => {
     req = mockReq({ body: { name: 42 }, params: { id: "cat123" } });
 
     // Act
     await updateCategoryController(req, res);
 
     // Assert
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        success: false,
-        message: "Error while updating category",
-      }),
-    );
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.send).toHaveBeenCalledWith({
+      success: false,
+      message: "Invalid input format. Fields must be text strings.",
+    });
     expect(categoryModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
