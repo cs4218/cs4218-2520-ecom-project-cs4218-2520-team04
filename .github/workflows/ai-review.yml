@@ -10,14 +10,79 @@ permissions:
   pages: write
   id-token: write
 
-# Only allow one review deploy at a time
+# Only allow one review deploy at a time per PR
 concurrency:
   group: "ai-review-${{ github.event.pull_request.number }}"
   cancel-in-progress: true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 1: Run the test suite and collect coverage
+#
+# Runs in parallel-ish with nothing, but the ai-review job depends on it so
+# coverage data is ready before the LLM call.  continue-on-error is set on
+# the test step so a failing test suite still produces partial coverage data
+# and does not block the review.
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    if: >
+      !contains(github.event.pull_request.title, '[skip-ai-review]')
+
+    outputs:
+      coverage-available: ${{ steps.check.outputs.available }}
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd client && npm install && cd ..
+
+      # Run the full sonar suite (unit + integration) with coverage.
+      # continue-on-error so a failing test does not skip the AI review.
+      - name: Run tests with coverage
+        id: run-tests
+        continue-on-error: true
+        run: npm run test:sonar 2>&1 | tail -40 || true
+        env:
+          CI: true
+
+      - name: Check coverage output
+        id: check
+        run: |
+          if [ -f coverage/coverage-final.json ]; then
+            echo "available=true"  >> "$GITHUB_OUTPUT"
+            echo "Coverage file found ($(du -sh coverage/coverage-final.json | cut -f1))"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No coverage-final.json generated — review will proceed without coverage data."
+          fi
+
+      - name: Upload coverage artifact
+        if: steps.check.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-pr-${{ github.event.pull_request.number }}
+          path: coverage/coverage-final.json
+          retention-days: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 2: AI review — coverage-aware analysis + test generation
+# ─────────────────────────────────────────────────────────────────────────────
   ai-review:
     runs-on: ubuntu-latest
+    needs: coverage
     if: >
       !contains(github.event.pull_request.title, '[skip-ai-review]')
 
@@ -33,53 +98,69 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: pip install openai
 
-      # --- Step 1: Run AI review and produce JSON ---
+      # Download coverage artifact produced by the coverage job (if available)
+      - name: Download coverage artifact
+        if: needs.coverage.outputs.coverage-available == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-pr-${{ github.event.pull_request.number }}
+          path: ./coverage
+
+      # ── Step 1: AI behavioural review (coverage-aware + test impact) ─────
       - name: Run AI review
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          OUTPUT_DIR: ./review_output
-          REPORT_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          BASE_SHA:           ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA:           ${{ github.event.pull_request.head.sha }}
+          PR_TITLE:           ${{ github.event.pull_request.title }}
+          PR_BODY:            ${{ github.event.pull_request.body }}
+          PR_NUMBER:          ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY:  ${{ github.repository }}
+          OUTPUT_DIR:         ./review_output
+          COVERAGE_FILE:      ./coverage/coverage-final.json
+          REPORT_URL: >-
+            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/
         run: |
           mkdir -p ./review_output
           python .github/scripts/ai_review.py
 
-      # --- Step 2: Build the interactive HTML report ---
+      # ── Step 2: Generate test suggestions for uncovered findings ─────────
+      - name: Generate test suggestions
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python .github/scripts/generate_tests.py \
+            ./review_output/report_data.json \
+            ./review_output/review_comment.md
+
+      # ── Step 3: Build the interactive HTML report ─────────────────────────
       - name: Build report site
         run: |
           python .github/scripts/build_report.py \
             ./review_output/report_data.json \
             ./site/pr/${{ github.event.pull_request.number }}
 
-      # --- Step 3: Download previous reports (if any) to keep history ---
+      # ── Step 4: Restore previous Pages reports to keep history ───────────
       - name: Restore previous Pages content
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Attempt to fetch existing gh-pages content to preserve other PR reports
           git fetch origin gh-pages:gh-pages 2>/dev/null || true
           if git rev-parse --verify gh-pages >/dev/null 2>&1; then
-            # Copy existing PR report dirs (except current PR, we'll overwrite it)
             git show gh-pages:pr/ 2>/dev/null && \
               git archive gh-pages -- pr/ | tar -x -C ./site/ 2>/dev/null || true
-            # Copy index files
             for f in index.html history.html .nojekyll; do
               git show gh-pages:$f > ./site/$f 2>/dev/null || true
             done
           fi
-          # Ensure .nojekyll exists
           touch ./site/.nojekyll
 
-      # --- Step 4: Deploy to GitHub Pages ---
+      # ── Step 5: Deploy to GitHub Pages ───────────────────────────────────
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -89,14 +170,16 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v4
 
-      # --- Step 5: Post PR comment with link to report ---
+      # ── Step 6: Post PR comment (review + generated tests) ───────────────
       - name: Post review comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPORT_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          REPORT_URL: >-
+            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/
         run: |
-          # Inject the report URL into the markdown comment
-          sed -i "s|REPORT_URL_PLACEHOLDER|$REPORT_URL|g" ./review_output/review_comment.md 2>/dev/null || true
+          # Replace placeholder with real URL (legacy compatibility)
+          sed -i "s|REPORT_URL_PLACEHOLDER|$REPORT_URL|g" \
+            ./review_output/review_comment.md 2>/dev/null || true
 
           # Delete any previous AI review comment to avoid clutter
           COMMENT_ID=$(gh api \

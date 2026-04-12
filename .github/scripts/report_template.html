@@ -345,6 +345,108 @@ body {
 }
 .tooltip:hover::after { opacity: 1 }
 
+/* ---------- Coverage bar ---------- */
+.cov-bar-wrap {
+  width: 100%; height: 4px; background: var(--bg-3);
+  border-radius: 2px; margin-top: 4px; overflow: hidden;
+}
+.cov-bar-fill { height: 100%; border-radius: 2px; transition: width .6s ease }
+.cov-label {
+  font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+/* ---------- Test impact panel ---------- */
+.impact-panel {
+  margin-top: 12px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.impact-panel-header {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; padding: 6px 12px;
+  background: var(--bg-2); color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: center;
+}
+.impact-list { list-style: none; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px }
+.impact-item {
+  font-size: 12px; font-family: var(--font-mono);
+  display: flex; align-items: center; gap: 6px; color: var(--text-secondary);
+}
+.impact-type {
+  font-size: 10px; font-weight: 700; padding: 1px 6px;
+  border-radius: 8px; text-transform: uppercase; letter-spacing: .4px; flex-shrink: 0;
+}
+.impact-type-unit        { background: var(--accent-subtle); color: var(--accent) }
+.impact-type-integration { background: var(--yellow-subtle); color: var(--yellow) }
+.impact-type-e2e         { background: var(--purple); color: #fff }
+
+/* ---------- Generated tests tab ---------- */
+.test-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.test-card:hover { border-color: var(--border-light); box-shadow: var(--shadow) }
+.test-card[data-confidence="high"]   { border-left: 3px solid var(--green) }
+.test-card[data-confidence="medium"] { border-left: 3px solid var(--yellow) }
+.test-card[data-confidence="low"]    { border-left: 3px solid var(--red) }
+
+.test-card-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; cursor: pointer; user-select: none;
+}
+.test-card-header:hover { background: var(--bg-2) }
+
+.test-conf-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.conf-high   { background: var(--green) }
+.conf-medium { background: var(--yellow) }
+.conf-low    { background: var(--red) }
+
+.test-card-title { flex: 1; font-weight: 600; font-size: 14px }
+.test-card-meta  { font-size: 12px; color: var(--text-muted) }
+
+.test-type-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 12px;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.badge-test-unit        { background: var(--accent-subtle); color: var(--accent) }
+.badge-test-integration { background: var(--yellow-subtle); color: var(--yellow) }
+.badge-test-e2e         { background: var(--purple); color: #fff; opacity: .9 }
+
+.test-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height .35s ease;
+}
+.test-card.open .test-body { max-height: 2000px }
+.test-body-content { padding: 0 20px 20px }
+
+.test-meta-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;
+}
+.test-meta-row .meta-item label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; color: var(--text-muted); display: block; margin-bottom: 3px;
+}
+.test-meta-row .meta-item p { font-size: 13px; color: var(--text-secondary); line-height: 1.5 }
+
+.copy-btn {
+  background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 12px; font-weight: 600;
+  padding: 4px 12px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: all var(--transition); float: right; margin-bottom: 6px;
+}
+.copy-btn:hover { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent) }
+.copy-btn.copied { background: var(--green-subtle); color: var(--green); border-color: var(--green) }
+
 /* ---------- Print ---------- */
 @media print {
   .topbar, .sidebar, .tabs, .filter-bar { display: none !important }
@@ -423,6 +525,9 @@ body {
     <div class="tabs">
       <button class="tab-btn active" data-tab="findings">Findings</button>
       <button class="tab-btn" data-tab="diff">Diff View</button>
+      <button class="tab-btn" data-tab="tests" id="tests-tab-btn" style="display:none">
+        Generated Tests
+      </button>
     </div>
 
     <!-- Findings tab -->
@@ -434,6 +539,11 @@ body {
     <!-- Diff tab -->
     <div class="tab-pane" id="tab-diff">
       <div id="diff-view"></div>
+    </div>
+
+    <!-- Generated Tests tab -->
+    <div class="tab-pane" id="tab-tests">
+      <div id="tests-view"></div>
     </div>
   </main>
 </div>
@@ -451,11 +561,13 @@ __REPORT_DATA__
   'use strict';
 
   const DATA = JSON.parse(document.getElementById('report-data').textContent);
-  const meta = DATA.metadata;
-  const review = DATA.review;
-  const files = DATA.files;
-  const related = DATA.related_files || [];
-  const findings = review.findings || [];
+  const meta           = DATA.metadata;
+  const review         = DATA.review;
+  const files          = DATA.files;
+  const related        = DATA.related_files  || [];
+  const findings       = review.findings     || [];
+  const testImpact     = DATA.test_impact    || {};
+  const generatedTests = DATA.generated_tests || [];
 
   // ---- Top bar ----
   const prLink = meta.pr_url
@@ -490,6 +602,26 @@ __REPORT_DATA__
   const sevCounts = { critical: 0, high: 0, medium: 0, low: 0 };
   findings.forEach(f => { if (sevCounts[f.severity] !== undefined) sevCounts[f.severity]++; });
 
+  // Average coverage across files that have coverage data
+  const covFiles = files.filter(f => f.coverage);
+  const avgCov   = covFiles.length
+    ? Math.round(covFiles.reduce((s, f) => s + f.coverage.pct, 0) / covFiles.length)
+    : null;
+  const covHtml  = avgCov !== null
+    ? `<div class="stat-card">
+         <div class="num ${avgCov >= 80 ? 'green' : avgCov >= 60 ? 'yellow' : 'red'}">${avgCov}%</div>
+         <div class="lbl">Avg coverage</div>
+       </div>`
+    : '';
+
+  const testCount = generatedTests.filter(t => t.code).length;
+  const testHtml  = testCount > 0
+    ? `<div class="stat-card" style="cursor:pointer" onclick="activateTab('tests')">
+         <div class="num" style="color:var(--purple)">${testCount}</div>
+         <div class="lbl">Tests generated</div>
+       </div>`
+    : '';
+
   document.getElementById('stats-row').innerHTML = `
     <div class="stat-card"><div class="num">${files.length}</div><div class="lbl">Files changed</div></div>
     <div class="stat-card"><div class="num green">+${totalAdd}</div><div class="lbl">Additions</div></div>
@@ -497,7 +629,14 @@ __REPORT_DATA__
     <div class="stat-card"><div class="num">${findings.length}</div><div class="lbl">Findings</div></div>
     <div class="stat-card"><div class="num red">${sevCounts.critical + sevCounts.high}</div><div class="lbl">Critical/High</div></div>
     <div class="stat-card"><div class="num yellow">${sevCounts.medium}</div><div class="lbl">Medium</div></div>
+    ${covHtml}
+    ${testHtml}
   `;
+
+  // Show the "Generated Tests" tab only when there are results
+  if (testCount > 0) {
+    document.getElementById('tests-tab-btn').style.display = '';
+  }
 
   // ---- File list ----
   const fileList = document.getElementById('file-list');
@@ -511,16 +650,32 @@ __REPORT_DATA__
     if (f.max_severity) {
       badge = `<span class="badge badge-${esc(f.max_severity)}">${f.finding_count}</span>`;
     }
+    const covBar = f.coverage
+      ? (() => {
+          const pct = f.coverage.pct;
+          const col = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--yellow)' : 'var(--red)';
+          return `<div style="flex-basis:100%;padding:0 2px">
+            <div class="cov-bar-wrap">
+              <div class="cov-bar-fill" style="width:${pct}%;background:${col}"></div>
+            </div>
+            <div class="cov-label">${pct}% covered</div>
+          </div>`;
+        })()
+      : '';
+
     li.innerHTML = `
-      <div style="flex:1;min-width:0">
+      <div style="flex:1;min-width:0;flex-wrap:wrap;display:flex;flex-direction:column">
         <div class="fdir">${esc(dir)}</div>
         <div class="fname">${esc(name)}</div>
+        ${covBar}
       </div>
-      <div class="file-stats">
-        <span class="add">+${f.additions}</span>
-        <span class="del">-${f.deletions}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div class="file-stats">
+          <span class="add">+${f.additions}</span>
+          <span class="del">-${f.deletions}</span>
+        </div>
+        ${badge}
       </div>
-      ${badge}
     `;
     li.addEventListener('click', () => {
       document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
@@ -614,6 +769,43 @@ __REPORT_DATA__
             ${f.code_after ? `<div class="code-block"><div class="code-block-label">After</div><pre>${esc(f.code_after)}</pre></div>` : ''}
           </div>` : '';
 
+      // Test impact panel — which test files exercise this changed file
+      const impactTests = testImpact[f.file] || [];
+      const impactHtml  = impactTests.length
+        ? `<div class="impact-panel">
+             <div class="impact-panel-header">
+               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+               ${impactTests.length} test file(s) exercise this file — re-run after merging
+             </div>
+             <ul class="impact-list">
+               ${impactTests.map(t =>
+                 `<li class="impact-item">
+                    <span class="impact-type impact-type-${esc(t.type)}">${esc(t.type)}</span>
+                    ${esc(t.path)}
+                  </li>`
+               ).join('')}
+             </ul>
+           </div>`
+        : '';
+
+      // Link to generated test suggestion for this finding (if any)
+      const genTest = generatedTests.find(gt => gt.finding_id === f.id && gt.code);
+      const genTestHtml = genTest
+        ? `<div style="margin-top:12px">
+             <button class="copy-btn" data-code="${esc(genTest.code)}"
+               onclick="copyCode(this)">Copy generated test</button>
+             <div class="code-block" style="clear:both;margin-top:6px">
+               <div class="code-block-label" style="display:flex;justify-content:space-between;align-items:center">
+                 <span>Generated test &nbsp;
+                   <span class="test-type-badge badge-test-${esc(genTest.test_type || 'unit')}">${esc(genTest.test_type || 'unit')}</span>
+                 </span>
+                 <span style="font-weight:400;color:var(--text-muted)">→ ${esc(genTest.test_file || '')}</span>
+               </div>
+               <pre>${esc(genTest.code)}</pre>
+             </div>
+           </div>`
+        : '';
+
       card.innerHTML = `
         <div class="finding-header">
           <div class="finding-sev sev-${esc(f.severity || 'low')}">${f.id || '?'}</div>
@@ -631,6 +823,8 @@ __REPORT_DATA__
             <div class="meta-item" style="grid-column:1/-1"><label>Suggestion</label><p>${esc(f.suggestion || '—')}</p></div>
           </div>
           ${codeCompare}
+          ${impactHtml}
+          ${genTestHtml}
         </div></div>
       `;
 
@@ -698,6 +892,93 @@ __REPORT_DATA__
 
   if (files.every(f => !f.diff)) {
     diffView.innerHTML = '<div class="empty-state"><p>No diffs available.</p></div>';
+  }
+
+  // ---- Generated Tests tab ----
+  (function renderTestsTab() {
+    const view = document.getElementById('tests-view');
+    const successful = generatedTests.filter(t => t.code);
+
+    if (successful.length === 0) {
+      view.innerHTML = `<div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <p>No test suggestions — either all findings are covered or generation is pending.</p>
+      </div>`;
+      return;
+    }
+
+    const confLabel = { high: '🟢 High', medium: '🟡 Medium', low: '🔴 Low' };
+
+    successful.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'test-card';
+      card.dataset.confidence = t.confidence || 'low';
+
+      card.innerHTML = `
+        <div class="test-card-header">
+          <div class="test-conf-dot conf-${esc(t.confidence || 'low')}"></div>
+          <div style="flex:1;min-width:0">
+            <div class="test-card-title">
+              Finding #${t.finding_id}: ${esc(t.finding_title || '')}
+            </div>
+            <div class="test-card-meta">${esc(t.description || '')}</div>
+          </div>
+          <span class="test-type-badge badge-test-${esc(t.test_type || 'unit')}">${esc(t.test_type || 'unit')}</span>
+          <span class="finding-chevron">&#9654;</span>
+        </div>
+        <div class="test-body"><div class="test-body-content">
+          <div class="test-meta-row">
+            <div class="meta-item">
+              <label>Insert into</label>
+              <p style="font-family:var(--font-mono)">${esc(t.test_file || 'new test file')}</p>
+            </div>
+            <div class="meta-item">
+              <label>Confidence</label>
+              <p>${esc(confLabel[t.confidence] || t.confidence || '—')} — ${esc(t.confidence_reason || '')}</p>
+            </div>
+            ${t.insert_into_describe
+              ? `<div class="meta-item" style="grid-column:1/-1">
+                   <label>Describe block</label>
+                   <p style="font-family:var(--font-mono)">${esc(t.insert_into_describe)}</p>
+                 </div>`
+              : ''}
+          </div>
+          <button class="copy-btn" data-code="${esc(t.code)}" onclick="copyCode(this)">Copy</button>
+          <div class="code-block" style="clear:both">
+            <div class="code-block-label">Generated test</div>
+            <pre>${esc(t.code)}</pre>
+          </div>
+        </div></div>
+      `;
+
+      card.querySelector('.test-card-header').addEventListener('click', () => {
+        card.classList.toggle('open');
+      });
+
+      view.appendChild(card);
+    });
+
+    // Auto-expand first card
+    const first = view.querySelector('.test-card');
+    if (first) first.classList.add('open');
+  })();
+
+  // ---- Copy-to-clipboard helper ----
+  function copyCode(btn) {
+    const code = btn.dataset.code || '';
+    navigator.clipboard.writeText(code).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    }).catch(() => {
+      btn.textContent = 'Failed';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    });
   }
 
   // ---- Helpers ----
