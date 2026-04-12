@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Review — {{PR_TITLE}}</title>
+<style>
+/* ======================================================================
+   CSS — Dark-first, modern design
+   ====================================================================== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg-0: #0d1117;
+  --bg-1: #161b22;
+  --bg-2: #1c2333;
+  --bg-3: #243044;
+  --border: #30363d;
+  --border-light: #444c56;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-subtle: #1f3a5f;
+  --green: #3fb950;
+  --green-subtle: #0d2818;
+  --yellow: #d29922;
+  --yellow-subtle: #3b2e00;
+  --orange: #db6d28;
+  --orange-subtle: #3d1e00;
+  --red: #f85149;
+  --red-subtle: #3d0e0e;
+  --purple: #bc8cff;
+  --diff-add-bg: #12261e;
+  --diff-add-border: #1b4721;
+  --diff-del-bg: #2d1114;
+  --diff-del-border: #5a1a1e;
+  --diff-hunk-bg: #1c2541;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 2px 12px rgba(0,0,0,.4);
+  --transition: .2s ease;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+html { scroll-behavior: smooth }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-0);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px }
+::-webkit-scrollbar-track { background: var(--bg-1) }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted) }
+
+/* ---------- Top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(13,17,23,.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 16px;
+}
+.topbar-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; white-space: nowrap }
+.topbar-logo svg { width: 22px; height: 22px }
+.topbar-pr { flex: 1; min-width: 0 }
+.topbar-pr a {
+  color: var(--accent); text-decoration: none; font-weight: 600; font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;
+}
+.topbar-pr a:hover { text-decoration: underline }
+.topbar-meta { font-size: 12px; color: var(--text-muted); white-space: nowrap }
+
+/* ---------- Risk banner ---------- */
+.risk-banner {
+  padding: 32px 24px;
+  display: flex; align-items: center; gap: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.risk-banner[data-risk="LOW"]    { background: linear-gradient(135deg, var(--green-subtle) 0%, var(--bg-0) 60%) }
+.risk-banner[data-risk="MEDIUM"] { background: linear-gradient(135deg, var(--yellow-subtle) 0%, var(--bg-0) 60%) }
+.risk-banner[data-risk="HIGH"]   { background: linear-gradient(135deg, var(--red-subtle) 0%, var(--bg-0) 60%) }
+
+.risk-gauge {
+  width: 88px; height: 88px; position: relative; flex-shrink: 0;
+}
+.risk-gauge svg { width: 100%; height: 100%; transform: rotate(-90deg) }
+.risk-gauge circle {
+  fill: none; stroke-width: 7; stroke-linecap: round;
+}
+.risk-gauge .track { stroke: var(--bg-3) }
+.risk-gauge .fill  { transition: stroke-dashoffset .8s ease, stroke .4s ease }
+.risk-gauge-label {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 14px; letter-spacing: .5px;
+}
+
+.risk-info h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px }
+.risk-info p  { color: var(--text-secondary); font-size: 15px; max-width: 640px }
+
+/* ---------- Stats row ---------- */
+.stats-row {
+  display: flex; gap: 1px; background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.stat-card {
+  flex: 1; background: var(--bg-1); padding: 18px 20px; text-align: center;
+}
+.stat-card .num { font-size: 28px; font-weight: 800; line-height: 1 }
+.stat-card .lbl { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 4px }
+.stat-card .num.green  { color: var(--green) }
+.stat-card .num.yellow { color: var(--yellow) }
+.stat-card .num.red    { color: var(--red) }
+
+/* ---------- Layout ---------- */
+.main-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  min-height: calc(100vh - 200px);
+}
+@media (max-width: 860px) {
+  .main-layout { grid-template-columns: 1fr }
+  .sidebar { border-right: none !important; border-bottom: 1px solid var(--border) }
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--bg-1);
+  overflow-y: auto;
+  max-height: calc(100vh - 50px);
+  position: sticky; top: 50px;
+}
+.sidebar-section { padding: 16px }
+.sidebar-section h3 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-muted); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.file-list { list-style: none }
+.file-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 13px; font-family: var(--font-mono);
+  transition: background var(--transition);
+  position: relative;
+}
+.file-item:hover { background: var(--bg-2) }
+.file-item.active { background: var(--accent-subtle); color: var(--accent) }
+.file-item .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.file-item .fdir  { color: var(--text-muted); font-size: 11px }
+.file-item .badge {
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+  line-height: 1.4;
+}
+.badge-critical { background: var(--red); color: #fff }
+.badge-high     { background: var(--orange); color: #fff }
+.badge-medium   { background: var(--yellow); color: #000 }
+.badge-low      { background: var(--green); color: #000 }
+
+.file-stats { display: flex; gap: 4px; font-size: 11px; font-family: var(--font-mono) }
+.file-stats .add { color: var(--green) }
+.file-stats .del { color: var(--red) }
+
+/* ---------- Content ---------- */
+.content { padding: 24px; overflow-x: hidden }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 24px;
+}
+.tab-btn {
+  background: none; border: none; color: var(--text-secondary);
+  padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: color var(--transition), border-color var(--transition);
+}
+.tab-btn:hover { color: var(--text-primary) }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent) }
+.tab-pane { display: none }
+.tab-pane.active { display: block; animation: fadeIn .25s ease }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
+
+/* ---------- Findings cards ---------- */
+.findings-grid { display: flex; flex-direction: column; gap: 16px }
+
+.finding-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.finding-card:hover { border-color: var(--border-light); box-shadow: var(--shadow) }
+.finding-card[data-severity="critical"] { border-left: 3px solid var(--red) }
+.finding-card[data-severity="high"]     { border-left: 3px solid var(--orange) }
+.finding-card[data-severity="medium"]   { border-left: 3px solid var(--yellow) }
+.finding-card[data-severity="low"]      { border-left: 3px solid var(--green) }
+
+.finding-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; cursor: pointer;
+  user-select: none;
+}
+.finding-header:hover { background: var(--bg-2) }
+.finding-sev {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; flex-shrink: 0;
+}
+.sev-critical { background: var(--red-subtle); color: var(--red) }
+.sev-high     { background: var(--orange-subtle); color: var(--orange) }
+.sev-medium   { background: var(--yellow-subtle); color: var(--yellow) }
+.sev-low      { background: var(--green-subtle); color: var(--green) }
+
+.finding-title { flex: 1; font-weight: 600; font-size: 15px }
+.finding-file  { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted) }
+.finding-chevron {
+  transition: transform var(--transition); color: var(--text-muted); font-size: 18px;
+}
+.finding-card.open .finding-chevron { transform: rotate(90deg) }
+
+.finding-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height .35s ease;
+}
+.finding-card.open .finding-body { max-height: 2000px }
+
+.finding-content { padding: 0 20px 20px }
+
+.finding-meta {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-bottom: 16px;
+}
+.meta-item label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; color: var(--text-muted); display: block; margin-bottom: 3px;
+}
+.meta-item p { font-size: 13px; color: var(--text-secondary); line-height: 1.5 }
+
+.finding-category {
+  display: inline-block; padding: 2px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px;
+  background: var(--bg-3); color: var(--text-secondary);
+}
+
+.code-compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;
+}
+@media (max-width: 700px) { .code-compare { grid-template-columns: 1fr } }
+
+.code-block {
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.code-block-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; padding: 6px 12px;
+  background: var(--bg-2); color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.code-block pre {
+  padding: 12px; margin: 0;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
+  overflow-x: auto; color: var(--text-primary);
+  white-space: pre; tab-size: 4;
+}
+
+/* ---------- Diff view ---------- */
+.diff-container {
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.diff-file-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 13px;
+}
+.diff-table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.55;
+}
+.diff-table td { padding: 0 12px; vertical-align: top; white-space: pre }
+.diff-ln {
+  width: 1%; min-width: 44px;
+  text-align: right; color: var(--text-muted);
+  user-select: none; padding: 0 8px;
+  border-right: 1px solid var(--border);
+}
+.diff-line-add { background: var(--diff-add-bg) }
+.diff-line-add .diff-ln { color: var(--green) }
+.diff-line-del { background: var(--diff-del-bg) }
+.diff-line-del .diff-ln { color: var(--red) }
+.diff-line-hunk { background: var(--diff-hunk-bg); color: var(--accent) }
+.diff-line-hunk td { font-style: italic }
+
+/* ---------- Empty states ---------- */
+.empty-state {
+  text-align: center; padding: 60px 24px;
+  color: var(--text-muted);
+}
+.empty-state svg { width: 64px; height: 64px; margin-bottom: 12px; opacity: .3 }
+.empty-state p { font-size: 15px }
+
+/* ---------- Filter pills ---------- */
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px }
+.filter-pill {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all var(--transition);
+  color: var(--text-secondary);
+}
+.filter-pill:hover { border-color: var(--accent); color: var(--accent) }
+.filter-pill.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent) }
+
+/* ---------- Tooltip ---------- */
+.tooltip {
+  position: relative;
+}
+.tooltip::after {
+  content: attr(data-tip);
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  background: var(--bg-3); color: var(--text-primary);
+  padding: 4px 10px; border-radius: 6px; font-size: 11px;
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity .15s;
+}
+.tooltip:hover::after { opacity: 1 }
+
+/* ---------- Print ---------- */
+@media print {
+  .topbar, .sidebar, .tabs, .filter-bar { display: none !important }
+  .main-layout { grid-template-columns: 1fr !important }
+  .content { padding: 0 !important }
+  .finding-card.open .finding-body { max-height: none !important }
+}
+
+/* ---------- Loading skeleton ---------- */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ===== Top bar ===== -->
+<header class="topbar">
+  <div class="topbar-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+    </svg>
+    AI Review
+  </div>
+  <div class="topbar-pr" id="topbar-pr"></div>
+  <div class="topbar-meta" id="topbar-meta"></div>
+</header>
+
+<!-- ===== Risk banner ===== -->
+<section class="risk-banner" id="risk-banner">
+  <div class="risk-gauge">
+    <svg viewBox="0 0 36 36">
+      <circle class="track" cx="18" cy="18" r="14.5"/>
+      <circle class="fill" id="gauge-fill" cx="18" cy="18" r="14.5"
+              stroke-dasharray="91.1" stroke-dashoffset="91.1"/>
+    </svg>
+    <div class="risk-gauge-label" id="gauge-label">—</div>
+  </div>
+  <div class="risk-info">
+    <h1 id="risk-title">Loading...</h1>
+    <p id="risk-summary"></p>
+  </div>
+</section>
+
+<!-- ===== Stats ===== -->
+<div class="stats-row" id="stats-row"></div>
+
+<!-- ===== Main ===== -->
+<div class="main-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h3>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        Changed Files
+      </h3>
+      <ul class="file-list" id="file-list"></ul>
+    </div>
+    <div class="sidebar-section" id="related-section" style="display:none">
+      <h3>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Related Files
+      </h3>
+      <ul class="file-list" id="related-list"></ul>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="findings">Findings</button>
+      <button class="tab-btn" data-tab="diff">Diff View</button>
+    </div>
+
+    <!-- Findings tab -->
+    <div class="tab-pane active" id="tab-findings">
+      <div class="filter-bar" id="filter-bar"></div>
+      <div class="findings-grid" id="findings-grid"></div>
+    </div>
+
+    <!-- Diff tab -->
+    <div class="tab-pane" id="tab-diff">
+      <div id="diff-view"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== Data injected at build time ===== -->
+<script id="report-data" type="application/json">
+__REPORT_DATA__
+</script>
+
+<script>
+/* ======================================================================
+   JavaScript — Interactive report
+   ====================================================================== */
+(function() {
+  'use strict';
+
+  const DATA = JSON.parse(document.getElementById('report-data').textContent);
+  const meta = DATA.metadata;
+  const review = DATA.review;
+  const files = DATA.files;
+  const related = DATA.related_files || [];
+  const findings = review.findings || [];
+
+  // ---- Top bar ----
+  const prLink = meta.pr_url
+    ? `<a href="${esc(meta.pr_url)}" target="_blank">#${esc(meta.pr_number)} ${esc(meta.pr_title)}</a>`
+    : `<a>${esc(meta.pr_title)}</a>`;
+  document.getElementById('topbar-pr').innerHTML = prLink;
+
+  const ts = meta.timestamp ? new Date(meta.timestamp).toLocaleString() : '';
+  document.getElementById('topbar-meta').textContent =
+    `${esc(meta.base_sha)}..${esc(meta.head_sha)} · ${ts}`;
+
+  // ---- Risk banner ----
+  const riskBanner = document.getElementById('risk-banner');
+  const risk = (review.risk || 'UNKNOWN').toUpperCase();
+  riskBanner.dataset.risk = risk;
+
+  const riskColor = { LOW: 'var(--green)', MEDIUM: 'var(--yellow)', HIGH: 'var(--red)' }[risk] || 'var(--text-muted)';
+  const riskPct = { LOW: 15, MEDIUM: 55, HIGH: 90 }[risk] || 50;
+  const gauge = document.getElementById('gauge-fill');
+  const circ = 91.1;
+  gauge.style.stroke = riskColor;
+  setTimeout(() => { gauge.style.strokeDashoffset = circ - (circ * riskPct / 100); }, 100);
+  document.getElementById('gauge-label').textContent = risk;
+  document.getElementById('gauge-label').style.color = riskColor;
+
+  document.getElementById('risk-title').textContent = `Risk: ${risk}`;
+  document.getElementById('risk-summary').textContent = review.summary || '';
+
+  // ---- Stats ----
+  const totalAdd = files.reduce((s, f) => s + (f.additions || 0), 0);
+  const totalDel = files.reduce((s, f) => s + (f.deletions || 0), 0);
+  const sevCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+  findings.forEach(f => { if (sevCounts[f.severity] !== undefined) sevCounts[f.severity]++; });
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="num">${files.length}</div><div class="lbl">Files changed</div></div>
+    <div class="stat-card"><div class="num green">+${totalAdd}</div><div class="lbl">Additions</div></div>
+    <div class="stat-card"><div class="num red">-${totalDel}</div><div class="lbl">Deletions</div></div>
+    <div class="stat-card"><div class="num">${findings.length}</div><div class="lbl">Findings</div></div>
+    <div class="stat-card"><div class="num red">${sevCounts.critical + sevCounts.high}</div><div class="lbl">Critical/High</div></div>
+    <div class="stat-card"><div class="num yellow">${sevCounts.medium}</div><div class="lbl">Medium</div></div>
+  `;
+
+  // ---- File list ----
+  const fileList = document.getElementById('file-list');
+  files.forEach((f, i) => {
+    const li = document.createElement('li');
+    li.className = 'file-item' + (i === 0 ? ' active' : '');
+    li.dataset.index = i;
+    const dir = f.path.includes('/') ? f.path.substring(0, f.path.lastIndexOf('/') + 1) : '';
+    const name = f.path.includes('/') ? f.path.substring(f.path.lastIndexOf('/') + 1) : f.path;
+    let badge = '';
+    if (f.max_severity) {
+      badge = `<span class="badge badge-${esc(f.max_severity)}">${f.finding_count}</span>`;
+    }
+    li.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <div class="fdir">${esc(dir)}</div>
+        <div class="fname">${esc(name)}</div>
+      </div>
+      <div class="file-stats">
+        <span class="add">+${f.additions}</span>
+        <span class="del">-${f.deletions}</span>
+      </div>
+      ${badge}
+    `;
+    li.addEventListener('click', () => {
+      document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+      li.classList.add('active');
+      // Switch to diff tab and scroll to the file
+      activateTab('diff');
+      const target = document.getElementById('diff-file-' + i);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    fileList.appendChild(li);
+  });
+
+  // ---- Related files ----
+  if (related.length > 0) {
+    document.getElementById('related-section').style.display = '';
+    const rl = document.getElementById('related-list');
+    related.forEach(r => {
+      const li = document.createElement('li');
+      li.className = 'file-item';
+      const name = r.path.includes('/') ? r.path.substring(r.path.lastIndexOf('/') + 1) : r.path;
+      li.innerHTML = `<div class="fname">${esc(name)}</div>`;
+      rl.appendChild(li);
+    });
+  }
+
+  // ---- Tabs ----
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+  });
+
+  function activateTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+  }
+
+  // ---- Filter bar ----
+  const categories = [...new Set(findings.map(f => f.category).filter(Boolean))];
+  const severities = ['critical', 'high', 'medium', 'low'];
+  const filterBar = document.getElementById('filter-bar');
+
+  const allPill = mkPill('All', 'all', true);
+  filterBar.appendChild(allPill);
+  severities.forEach(s => {
+    if (findings.some(f => f.severity === s)) filterBar.appendChild(mkPill(s, 'sev:' + s));
+  });
+  categories.forEach(c => {
+    filterBar.appendChild(mkPill(c.replace(/-/g, ' '), 'cat:' + c));
+  });
+
+  let activeFilter = 'all';
+  function mkPill(label, value, active) {
+    const el = document.createElement('button');
+    el.className = 'filter-pill' + (active ? ' active' : '');
+    el.textContent = label;
+    el.addEventListener('click', () => {
+      activeFilter = value;
+      document.querySelectorAll('.filter-pill').forEach(p => p.classList.toggle('active', p === el));
+      renderFindings();
+    });
+    return el;
+  }
+
+  // ---- Findings ----
+  const findingsGrid = document.getElementById('findings-grid');
+
+  function renderFindings() {
+    findingsGrid.innerHTML = '';
+    let visible = findings;
+    if (activeFilter !== 'all') {
+      if (activeFilter.startsWith('sev:')) visible = findings.filter(f => f.severity === activeFilter.slice(4));
+      else if (activeFilter.startsWith('cat:')) visible = findings.filter(f => f.category === activeFilter.slice(4));
+    }
+
+    if (visible.length === 0) {
+      findingsGrid.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          <p>${findings.length === 0 ? 'No behavioural issues found — looking good!' : 'No findings match the current filter.'}</p>
+        </div>`;
+      return;
+    }
+
+    visible.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'finding-card';
+      card.dataset.severity = f.severity || 'low';
+
+      const codeCompare = (f.code_before || f.code_after)
+        ? `<div class="code-compare">
+            ${f.code_before ? `<div class="code-block"><div class="code-block-label">Before</div><pre>${esc(f.code_before)}</pre></div>` : ''}
+            ${f.code_after ? `<div class="code-block"><div class="code-block-label">After</div><pre>${esc(f.code_after)}</pre></div>` : ''}
+          </div>` : '';
+
+      card.innerHTML = `
+        <div class="finding-header">
+          <div class="finding-sev sev-${esc(f.severity || 'low')}">${f.id || '?'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="finding-title">${esc(f.title || 'Finding')}</div>
+            <div class="finding-file">${esc(f.file || '')} ${f.line_start ? `:${f.line_start}` : ''}${f.line_end ? `-${f.line_end}` : ''}</div>
+          </div>
+          <span class="finding-category">${esc((f.category || '').replace(/-/g, ' '))}</span>
+          <span class="finding-chevron">&#9654;</span>
+        </div>
+        <div class="finding-body"><div class="finding-content">
+          <div class="finding-meta">
+            <div class="meta-item"><label>Behaviour Change</label><p>${esc(f.behaviour_change || '—')}</p></div>
+            <div class="meta-item"><label>Test Gap</label><p>${esc(f.test_gap || '—')}</p></div>
+            <div class="meta-item" style="grid-column:1/-1"><label>Suggestion</label><p>${esc(f.suggestion || '—')}</p></div>
+          </div>
+          ${codeCompare}
+        </div></div>
+      `;
+
+      card.querySelector('.finding-header').addEventListener('click', () => {
+        card.classList.toggle('open');
+      });
+
+      findingsGrid.appendChild(card);
+    });
+
+    // auto-expand first card
+    const first = findingsGrid.querySelector('.finding-card');
+    if (first) first.classList.add('open');
+  }
+  renderFindings();
+
+  // ---- Diff view ----
+  const diffView = document.getElementById('diff-view');
+  files.forEach((f, idx) => {
+    if (!f.diff) return;
+    const container = document.createElement('div');
+    container.className = 'diff-container';
+    container.id = 'diff-file-' + idx;
+
+    const lines = parseDiff(f.diff);
+    let tableRows = '';
+    lines.forEach(l => {
+      const cls = l.type === 'add' ? 'diff-line-add'
+                : l.type === 'del' ? 'diff-line-del'
+                : l.type === 'hunk' ? 'diff-line-hunk' : '';
+      const oldLn = l.oldLn || '';
+      const newLn = l.newLn || '';
+      tableRows += `<tr class="${cls}">
+        <td class="diff-ln">${oldLn}</td>
+        <td class="diff-ln">${newLn}</td>
+        <td>${esc(l.text)}</td>
+      </tr>`;
+    });
+
+    // Findings annotations for this file
+    const fileFindings = findings.filter(fi => fi.file === f.path);
+    let annotationHtml = '';
+    if (fileFindings.length > 0) {
+      annotationHtml = `<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+        ${fileFindings.map(fi => `<span class="badge badge-${esc(fi.severity || 'low')}" style="font-size:11px;padding:2px 8px;cursor:pointer" onclick="document.querySelector('.finding-card[data-severity] .finding-title')?.closest('.finding-card')?.classList.add('open')">${esc(fi.title || 'Finding')}</span>`).join('')}
+      </div>`;
+    }
+
+    container.innerHTML = `
+      <div class="diff-file-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        ${esc(f.path)}
+        <span style="margin-left:auto;font-size:11px">
+          <span style="color:var(--green)">+${f.additions}</span>
+          <span style="color:var(--red)">-${f.deletions}</span>
+        </span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="diff-table"><tbody>${tableRows}</tbody></table>
+      </div>
+      ${annotationHtml}
+    `;
+    diffView.appendChild(container);
+  });
+
+  if (files.every(f => !f.diff)) {
+    diffView.innerHTML = '<div class="empty-state"><p>No diffs available.</p></div>';
+  }
+
+  // ---- Helpers ----
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function parseDiff(raw) {
+    const result = [];
+    if (!raw) return result;
+    const lines = raw.split('\n');
+    let oldN = 0, newN = 0;
+    for (const line of lines) {
+      if (line.startsWith('@@')) {
+        const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (m) { oldN = parseInt(m[1]); newN = parseInt(m[2]); }
+        result.push({ type: 'hunk', text: line, oldLn: '...', newLn: '...' });
+      } else if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ')) {
+        // skip header lines
+      } else if (line.startsWith('+')) {
+        result.push({ type: 'add', text: line.substring(1), oldLn: '', newLn: newN++ });
+      } else if (line.startsWith('-')) {
+        result.push({ type: 'del', text: line.substring(1), oldLn: oldN++, newLn: '' });
+      } else {
+        result.push({ type: 'ctx', text: line.startsWith(' ') ? line.substring(1) : line, oldLn: oldN++, newLn: newN++ });
+      }
+    }
+    return result;
+  }
+
+})();
+</script>
+</body>
+</html>

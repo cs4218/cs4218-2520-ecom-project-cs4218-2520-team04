@@ -72,8 +72,7 @@
  *   TEST_PRODUCT_ID     - product _id for related_products scenario
  *   TEST_CATEGORY_ID    - category _id for related_products scenario
  *   TEST_CATEGORY_SLUG  - category slug for category_products scenario (default: test-category)
- *
- * Test suite written by Mervyn Teo Zi Yan, A0273039A
+ * 
  */
 
 import http from "k6/http";
@@ -101,7 +100,6 @@ const BASE_URL = __ENV.BASE_URL || "http://localhost:6060";
 //
 // Ramp-down (0 VUs over 30s): Gracefully reduces load to observe how
 // the server recovers and whether any resource cleanup issues appear.
-// Mervyn Teo Zi Yan, A0273039A
 const VOLUME_STAGES = [
   { duration: "30s", target: 50 },   // ramp up
   { duration: "5m", target: 200 },   // sustained high load
@@ -125,7 +123,6 @@ const totalReqs = new Counter("total_requests");
 
 // ─── Thresholds ──────────────────────────────────────────────────────────────
 
-// Mervyn Teo Zi Yan, A0273039A
 export const options = {
   scenarios: buildScenarios(),
   thresholds: {
@@ -161,7 +158,6 @@ export const options = {
  * If login fails (user not found), registers a new test user and logs in.
  * Returned data is passed to scenario functions that need authentication.
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function setup() {
   const email    = __ENV.TEST_EMAIL    || "volumetest@volume.test";
   const password = __ENV.TEST_PASSWORD || "Volume1234!";
@@ -181,7 +177,6 @@ export function setup() {
   }
 
   // If login failed, register a new user and login again
-  // Mervyn Teo Zi Yan, A0273039A
   if (!token) {
     const regPayload = JSON.stringify({
       name:     "Volume Test User",
@@ -214,7 +209,6 @@ export function setup() {
 
 // ─── Scenario Builder ────────────────────────────────────────────────────────
 
-// Mervyn Teo Zi Yan, A0273039A
 function buildScenarios() {
   const all = {
     /**
@@ -222,7 +216,6 @@ function buildScenarios() {
      * Verifies that bcrypt hashing does not cause response time degradation
      * over many minutes of continuous auth traffic.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     auth_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -236,7 +229,6 @@ function buildScenarios() {
      * Verifies that the product listing, count, and pagination endpoints
      * remain responsive over prolonged high concurrency.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     products_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -251,7 +243,6 @@ function buildScenarios() {
      * Verifies that this lightweight read endpoint remains fast even when
      * served to hundreds of concurrent users continuously.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     categories_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -266,7 +257,6 @@ function buildScenarios() {
      * Verifies that MongoDB regex search stays responsive under continuous
      * diverse search traffic.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     search_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -281,7 +271,6 @@ function buildScenarios() {
      * Verifies that filter queries with various category and price
      * combinations remain performant over an extended period.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     filters_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -296,7 +285,6 @@ function buildScenarios() {
      * Verifies that repeated reads of a single product document remain
      * consistent and fast over time.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     single_product_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -311,7 +299,6 @@ function buildScenarios() {
      * Verifies that the related products query (category match + exclusion)
      * remains fast under prolonged concurrent access.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     related_products_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -326,7 +313,6 @@ function buildScenarios() {
      * Verifies that fetching all products within a category handles
      * continuous high concurrency without degradation.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     category_products_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -341,7 +327,6 @@ function buildScenarios() {
      * Verifies that the authenticated orders endpoint with populated
      * product/buyer fields handles sustained concurrent reads.
      */
-    // Mervyn Teo Zi Yan, A0273039A
     user_orders_volume: {
       executor: "ramping-vus",
       startVUs: 0,
@@ -374,7 +359,6 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
  * Attempt login with test credentials.
  * Returns the token string or null on failure.
  */
-// Mervyn Teo Zi Yan, A0273039A
 function login() {
   const payload = JSON.stringify({
     email:    __ENV.TEST_EMAIL    || "volumetest@volume.test",
@@ -426,7 +410,6 @@ function authHeader(token) {
 export function authScenario() {
   group("auth", () => {
     // Register a unique user per VU iteration
-    // Mervyn Teo Zi Yan, A0273039A
     const uid     = `${__VU}_${__ITER}_${Date.now()}`;
     const payload = JSON.stringify({
       name:     `VolumeUser ${uid}`,
@@ -456,7 +439,6 @@ export function authScenario() {
     sleep(0.5);
 
     // Login with the same credentials
-    // Mervyn Teo Zi Yan, A0273039A
     const loginPayload = JSON.stringify({
       email:    `voluser_${uid}@volume.test`,
       password: "Volume1234!",
@@ -501,11 +483,9 @@ export function authScenario() {
  *   GET /api/v1/product/product-count
  *   GET /api/v1/product/product-list/:page
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function productsScenario() {
   group("products", () => {
     // List all products
-    // Mervyn Teo Zi Yan, A0273039A
     const listRes = http.get(`${BASE_URL}/api/v1/product/get-product`, {
       tags: { name: "GET /api/v1/product/get-product" },
     });
@@ -527,7 +507,6 @@ export function productsScenario() {
     sleep(0.3);
 
     // Product count
-    // Mervyn Teo Zi Yan, A0273039A
     const countRes = http.get(`${BASE_URL}/api/v1/product/product-count`, {
       tags: { name: "GET /api/v1/product/product-count" },
     });
@@ -546,7 +525,6 @@ export function productsScenario() {
     sleep(0.3);
 
     // Paginated list — cycle through pages 1-3 based on VU and iteration
-    // Mervyn Teo Zi Yan, A0273039A
     const page = (__ITER % 3) + 1;
     const pageRes = http.get(`${BASE_URL}/api/v1/product/product-list/${page}`, {
       tags: { name: "GET /api/v1/product/product-list/:page" },
@@ -580,10 +558,8 @@ export function productsScenario() {
  *
  * Endpoints: GET /api/v1/category/get-category
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function categoriesScenario() {
   group("categories", () => {
-    // Mervyn Teo Zi Yan, A0273039A
     const res = http.get(`${BASE_URL}/api/v1/category/get-category`, {
       tags: { name: "GET /api/v1/category/get-category" },
     });
@@ -621,10 +597,8 @@ const SEARCH_KEYWORDS = ["shirt", "phone", "book", "laptop", "shoes", "watch", "
  *
  * Endpoints: GET /api/v1/product/search/:keyword
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function searchScenario() {
   group("search", () => {
-    // Mervyn Teo Zi Yan, A0273039A
     const keyword = SEARCH_KEYWORDS[(__VU + __ITER) % SEARCH_KEYWORDS.length];
 
     const res = http.get(`${BASE_URL}/api/v1/product/search/${keyword}`, {
@@ -649,7 +623,6 @@ export function searchScenario() {
 // ─── Scenario: Filters ───────────────────────────────────────────────────────
 
 // Diverse filter combinations to exercise different query patterns
-// Mervyn Teo Zi Yan, A0273039A
 const FILTER_PAYLOADS = [
   { checked: [], radio: [] },                          // no filters (all products)
   { checked: [], radio: [0, 19] },                     // price range: $0-$19
@@ -674,10 +647,8 @@ const FILTER_PAYLOADS = [
  *
  * Endpoints: POST /api/v1/product/product-filters
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function filtersScenario() {
   group("filters", () => {
-    // Mervyn Teo Zi Yan, A0273039A
     const filterData = FILTER_PAYLOADS[(__VU + __ITER) % FILTER_PAYLOADS.length];
     const payload = JSON.stringify(filterData);
 
@@ -719,10 +690,8 @@ export function filtersScenario() {
  *
  * Configure via: -e TEST_PRODUCT_SLUG=my-product-slug
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function singleProductScenario() {
   group("single_product", () => {
-    // Mervyn Teo Zi Yan, A0273039A
     const slug = __ENV.TEST_PRODUCT_SLUG || "test-product";
 
     const res = http.get(`${BASE_URL}/api/v1/product/get-product/${slug}`, {
@@ -760,10 +729,8 @@ export function singleProductScenario() {
  *
  * Configure via: -e TEST_PRODUCT_ID=<id> -e TEST_CATEGORY_ID=<id>
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function relatedProductsScenario() {
   group("related_products", () => {
-    // Mervyn Teo Zi Yan, A0273039A
     const pid = __ENV.TEST_PRODUCT_ID  || "000000000000000000000001";
     const cid = __ENV.TEST_CATEGORY_ID || "000000000000000000000001";
 
@@ -802,7 +769,6 @@ export function relatedProductsScenario() {
  *
  * Configure via: -e TEST_CATEGORY_SLUG=my-category-slug
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function categoryProductsScenario() {
   group("category_products", () => {
     // Mervyn Teo Zi Yan, A0273039A
@@ -843,11 +809,9 @@ export function categoryProductsScenario() {
  *
  * A token is obtained once in setup() and shared across all VUs.
  */
-// Mervyn Teo Zi Yan, A0273039A
 export function userOrdersScenario(data) {
   group("user_orders", () => {
     // Fall back to per-VU login if setup() did not produce a token
-    // Mervyn Teo Zi Yan, A0273039A
     const token = (data && data.token) ? data.token : login();
 
     if (!token) {

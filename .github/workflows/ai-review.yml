@@ -7,11 +7,17 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  pages: write
+  id-token: write
+
+# Only allow one review deploy at a time
+concurrency:
+  group: "ai-review-${{ github.event.pull_request.number }}"
+  cancel-in-progress: true
 
 jobs:
   ai-review:
     runs-on: ubuntu-latest
-    # Skip for trivial changes (docs-only, CI config, etc.)
     if: >
       !contains(github.event.pull_request.title, '[skip-ai-review]')
 
@@ -20,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0          # full history so we can diff against base
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,20 +36,68 @@ jobs:
       - name: Install dependencies
         run: pip install openai
 
-      - name: Gather context & run AI review
-        id: review
+      # --- Step 1: Run AI review and produce JSON ---
+      - name: Run AI review
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
-        run: python .github/scripts/ai_review.py > review_output.md
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OUTPUT_DIR: ./review_output
+          REPORT_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+        run: |
+          mkdir -p ./review_output
+          python .github/scripts/ai_review.py
 
-      - name: Post review comment
+      # --- Step 2: Build the interactive HTML report ---
+      - name: Build report site
+        run: |
+          python .github/scripts/build_report.py \
+            ./review_output/report_data.json \
+            ./site/pr/${{ github.event.pull_request.number }}
+
+      # --- Step 3: Download previous reports (if any) to keep history ---
+      - name: Restore previous Pages content
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Attempt to fetch existing gh-pages content to preserve other PR reports
+          git fetch origin gh-pages:gh-pages 2>/dev/null || true
+          if git rev-parse --verify gh-pages >/dev/null 2>&1; then
+            # Copy existing PR report dirs (except current PR, we'll overwrite it)
+            git show gh-pages:pr/ 2>/dev/null && \
+              git archive gh-pages -- pr/ | tar -x -C ./site/ 2>/dev/null || true
+            # Copy index files
+            for f in index.html history.html .nojekyll; do
+              git show gh-pages:$f > ./site/$f 2>/dev/null || true
+            done
+          fi
+          # Ensure .nojekyll exists
+          touch ./site/.nojekyll
+
+      # --- Step 4: Deploy to GitHub Pages ---
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+      # --- Step 5: Post PR comment with link to report ---
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+        run: |
+          # Inject the report URL into the markdown comment
+          sed -i "s|REPORT_URL_PLACEHOLDER|$REPORT_URL|g" ./review_output/review_comment.md 2>/dev/null || true
+
           # Delete any previous AI review comment to avoid clutter
           COMMENT_ID=$(gh api \
             "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
@@ -56,4 +110,4 @@ jobs:
           fi
 
           gh pr comment ${{ github.event.pull_request.number }} \
-            --body-file review_output.md
+            --body-file ./review_output/review_comment.md
