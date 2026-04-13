@@ -513,6 +513,7 @@ class AgentRuntime:
                     self._write_session_baselines[item.target_file] = self._fresh_route_test_scaffold(item)
             existing_test_snippet = self._write_session_baselines[item.target_file]
             reference_test_context = self._reference_test_context(item.target_file)
+<<<<<<< HEAD
             route_setup_hint = self._route_generation_hint(item, existing_test_snippet)
             if route_setup_hint:
                 reference_test_context = (
@@ -520,6 +521,8 @@ class AgentRuntime:
                     if reference_test_context
                     else route_setup_hint
                 )
+=======
+>>>>>>> ed85bf56e57312a9f8baf519f230a980231f7faf
 
             design_brief = self._design_write_fix(
                 item,
@@ -698,6 +701,7 @@ class AgentRuntime:
 
         return "\n\n---\n\n".join(snippets) if snippets else None
 
+<<<<<<< HEAD
     def _route_generation_hint(self, item: GapPlanItem, existing_test_snippet: str | None) -> str | None:
         if item.source_kind != "route" or existing_test_snippet:
             return None
@@ -816,6 +820,8 @@ class AgentRuntime:
         relative = os.path.relpath(target, start=from_dir).replace("\\", "/")
         return relative if relative.startswith(".") else f"./{relative}"
 
+=======
+>>>>>>> ed85bf56e57312a9f8baf519f230a980231f7faf
     def _summarize_failure_feedback(self, raw_feedback: str) -> str:
         lines = [line.strip() for line in raw_feedback.splitlines() if line.strip()]
         priority_markers = (
