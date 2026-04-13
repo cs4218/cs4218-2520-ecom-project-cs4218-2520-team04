@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover - fallback for plain python runs without
         return None
 
 from .agents import AgentRuntime
-from .config import RuntimeConfig
+from .config import RuntimeConfig, load_project_env
 from .graph import build_analyze_graph, build_write_graph
 from .interactive import color_priority, confirm_selection, format_gap_item, prompt_for_selection
 from .schemas import GapPlanItem
@@ -53,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def config_from_args(args: argparse.Namespace) -> RuntimeConfig:
     project_root = Path(__file__).resolve().parent.parent
+    load_project_env(project_root)
     artifact_dir = args.artifact_dir or project_root / "artifacts"
     os.environ.setdefault("UV_CACHE_DIR", str(project_root / ".uv-cache"))
     return RuntimeConfig(
@@ -85,6 +86,11 @@ def run_analyze(runtime: AgentRuntime, config: RuntimeConfig) -> int:
 
 def run_write(runtime: AgentRuntime, config: RuntimeConfig) -> int:
     runtime.health_check()
+    if not config.dry_run and not runtime.llm.is_available():
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. The write stage now fails fast instead of generating placeholder tests. "
+            "Set the key in your shell or in multi-agentic-system/.env and rerun."
+        )
     artifact_path = config.artifact_dir / "gap_plan.json"
     if not artifact_path.exists():
         print(f"{Fore.YELLOW}No gap_plan.json found, running analyze first.{Style.RESET_ALL}")
