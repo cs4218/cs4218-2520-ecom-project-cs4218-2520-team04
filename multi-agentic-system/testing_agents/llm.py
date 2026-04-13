@@ -71,6 +71,7 @@ class OpenAILLM:
             - Write only one focused incremental describe/it block for this gap.
             - If existing target test file content is provided, treat it as the full current file and return ONLY the new block to append.
             - Do not repeat or recreate imports, jest.mock calls, helper declarations, beforeAll/beforeEach hooks, or existing tests that are already present in the target file.
+            - Avoid adding new `jest.mock()` factories unless absolutely necessary. If a mock factory is required, do not reference out-of-scope variables from the factory body.
             - If the plan marks this as a negative case, prioritize rejection, validation, unauthorized, forbidden, malformed input, or failure-path assertions over happy-path assertions.
             - Avoid placeholders like TODO.
             - Prefer deterministic mocks.

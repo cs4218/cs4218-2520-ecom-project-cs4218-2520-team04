@@ -43,7 +43,7 @@ class RuntimeConfig:
     dry_run: bool = False
     verbose: bool = True
     backend_concurrency: int = field(default_factory=lambda: int(os.environ.get("BACKEND_ANALYST_CONCURRENCY", "6")))
-    write_retry_limit: int = field(default_factory=lambda: int(os.environ.get("WRITE_RETRY_LIMIT", "2")))
+    write_retry_limit: int = field(default_factory=lambda: int(os.environ.get("WRITE_RETRY_LIMIT", "5")))
     paths: tuple[str, ...] = ()
 
     def ensure_directories(self) -> None:

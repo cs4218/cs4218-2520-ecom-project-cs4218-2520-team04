@@ -4,6 +4,7 @@ import os
 import shutil
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from testing_agents.config import RuntimeConfig, load_project_env
 
@@ -50,12 +51,14 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.writer_model, "gpt-5-mini")
 
     def test_write_retry_limit_defaults_to_five(self) -> None:
-        config = RuntimeConfig(command="write")
-        self.assertEqual(config.write_retry_limit, 5)
+        with patch.dict(os.environ, {}, clear=True):
+            config = RuntimeConfig(command="write")
+            self.assertEqual(config.write_retry_limit, 5)
 
     def test_writer_model_defaults_to_gpt_5_mini(self) -> None:
-        config = RuntimeConfig(command="write")
-        self.assertEqual(config.writer_model, "gpt-5-mini")
+        with patch.dict(os.environ, {}, clear=True):
+            config = RuntimeConfig(command="write")
+            self.assertEqual(config.writer_model, "gpt-5-mini")
 
 
 if __name__ == "__main__":

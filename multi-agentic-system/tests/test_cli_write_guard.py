@@ -24,6 +24,9 @@ class _FakeRuntime:
     def health_check(self) -> None:
         return None
 
+    def reset_write_session(self) -> None:
+        return None
+
 
 class CliWriteGuardTests(unittest.TestCase):
     def test_run_write_fails_fast_without_openai_key(self) -> None:
