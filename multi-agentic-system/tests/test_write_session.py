@@ -71,6 +71,49 @@ class WriteSessionTests(unittest.TestCase):
         self.assertTrue(second_content.startswith("import request from 'supertest';"))
         self.assertEqual(first_content, second_content)
 
+    def test_fresh_route_integration_file_gets_deterministic_scaffold(self) -> None:
+        target = FIXTURE_ROOT / "tests/integration/backend/admin/freshCategoryRoutes.integration.test.js"
+        if target.exists():
+            target.unlink()
+
+        runtime = AgentRuntime(
+            RuntimeConfig(
+                command="write",
+                repo_root=FIXTURE_ROOT,
+                project_root=FIXTURE_ROOT,
+                artifact_dir=FIXTURE_ROOT / "artifacts",
+                verbose=False,
+                openai_api_key=None,
+            )
+        )
+        runtime.reset_write_session()
+
+        plan = GapPlanItem(
+            gap_id="g2",
+            priority="P0",
+            case_type="negative",
+            source_file="routes/categoryRoutes.js",
+            source_kind="route",
+            behavior_summary="POST /create-category protected route rejection path",
+            rationale="Missing auth gating coverage via requireSignIn and isAdmin",
+            suite_type="integration",
+            target_file="tests/integration/backend/admin/freshCategoryRoutes.integration.test.js",
+            target_command="npm run test:integration -- tests/integration/backend/admin/freshCategoryRoutes.integration.test.js --runInBand",
+            append_mode="create",
+            coverage_status="uncovered",
+            confidence=0.9,
+            scenario_summary="exercise protected create-category rejection path",
+        )
+
+        runtime.write_fix_batch([plan], attempt=1)
+        content = target.read_text(encoding="utf-8")
+
+        self.assertIn('import express from "express";', content)
+        self.assertIn('import request from "supertest";', content)
+        self.assertIn('import jwt from "jsonwebtoken";', content)
+        self.assertIn('let app;', content)
+        self.assertIn('app.use("/api/v1/category", categoryRoutes);', content)
+
 
 if __name__ == "__main__":
     unittest.main()

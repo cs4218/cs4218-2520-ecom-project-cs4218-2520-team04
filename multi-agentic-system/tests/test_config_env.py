@@ -39,7 +39,7 @@ class ConfigEnvTests(unittest.TestCase):
 
     def test_load_project_env_applies_before_runtime_config(self) -> None:
         (FIXTURE_ROOT / ".env").write_text(
-            "OPENAI_API_KEY=test-key\nOPENAI_SUPERVISOR_MODEL=gpt-5.4-mini\nOPENAI_WRITER_MODEL=gpt-5-mini\n",
+            "OPENAI_API_KEY=test-key\nOPENAI_SUPERVISOR_MODEL=gpt-5.4-mini\nOPENAI_WRITER_MODEL=gpt-5.4-mini\n",
             encoding="utf-8",
         )
 
@@ -48,17 +48,17 @@ class ConfigEnvTests(unittest.TestCase):
 
         self.assertEqual(config.openai_api_key, "test-key")
         self.assertEqual(config.supervisor_model, "gpt-5.4-mini")
-        self.assertEqual(config.writer_model, "gpt-5-mini")
+        self.assertEqual(config.writer_model, "gpt-5.4-mini")
 
     def test_write_retry_limit_defaults_to_five(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = RuntimeConfig(command="write")
             self.assertEqual(config.write_retry_limit, 5)
 
-    def test_writer_model_defaults_to_gpt_5_mini(self) -> None:
+    def test_writer_model_defaults_to_gpt_5_4_mini(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = RuntimeConfig(command="write")
-            self.assertEqual(config.writer_model, "gpt-5-mini")
+            self.assertEqual(config.writer_model, "gpt-5.4-mini")
 
 
 if __name__ == "__main__":

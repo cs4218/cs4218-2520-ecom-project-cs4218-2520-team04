@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from pathlib import Path
 from typing import Iterable
@@ -509,15 +510,31 @@ class AgentRuntime:
                 if target_path.exists():
                     self._write_session_baselines[item.target_file] = self.source_reader.read_full(item.target_file)
                 else:
-                    self._write_session_baselines[item.target_file] = None
+                    self._write_session_baselines[item.target_file] = self._fresh_route_test_scaffold(item)
             existing_test_snippet = self._write_session_baselines[item.target_file]
+            reference_test_context = self._reference_test_context(item.target_file)
+            route_setup_hint = self._route_generation_hint(item, existing_test_snippet)
+            if route_setup_hint:
+                reference_test_context = (
+                    f"{reference_test_context}\n\n---\n\n{route_setup_hint}"
+                    if reference_test_context
+                    else route_setup_hint
+                )
 
-            design_brief = self._design_write_fix(item, source_snippet, existing_test_snippet, feedback_by_gap.get(item.gap_id), attempt)
+            design_brief = self._design_write_fix(
+                item,
+                source_snippet,
+                existing_test_snippet,
+                reference_test_context,
+                feedback_by_gap.get(item.gap_id),
+                attempt,
+            )
             self.tracer.agent_start("TestWriterAgent", f"Generating test patch for {item.target_file} (attempt {attempt})")
             test_code = self._generate_test_code(
                 item,
                 source_snippet,
                 existing_test_snippet,
+                reference_test_context=reference_test_context,
                 design_brief=design_brief,
                 failure_feedback=feedback_by_gap.get(item.gap_id),
                 attempt=attempt,
@@ -602,6 +619,7 @@ class AgentRuntime:
         item: GapPlanItem,
         source_snippet: str,
         existing_test_snippet: str | None,
+        reference_test_context: str | None = None,
         design_brief: str | None = None,
         failure_feedback: str | None = None,
         attempt: int = 1,
@@ -611,6 +629,7 @@ class AgentRuntime:
                 item,
                 source_snippet,
                 existing_test_snippet,
+                reference_test_context=reference_test_context,
                 design_brief=design_brief,
                 failure_feedback=failure_feedback,
                 attempt=attempt,
@@ -633,6 +652,7 @@ class AgentRuntime:
         item: GapPlanItem,
         source_snippet: str,
         existing_test_snippet: str | None,
+        reference_test_context: str | None,
         failure_feedback: str | None,
         attempt: int,
     ) -> str:
@@ -641,11 +661,160 @@ class AgentRuntime:
             self.tracer.agent_done("TestDesignAgent", f"Dry-run only for {item.target_file}")
             return "Dry run enabled; no design brief generated."
         if self.llm.is_available():
-            brief = self.llm.design_write_fix(item, source_snippet, existing_test_snippet, failure_feedback, attempt)
+            brief = self.llm.design_write_fix(
+                item,
+                source_snippet,
+                existing_test_snippet,
+                reference_test_context,
+                failure_feedback,
+                attempt,
+            )
             self.tracer.agent_done("TestDesignAgent", f"Prepared design brief for {item.target_file}")
             return brief or f"Write one focused Jest test for: {item.scenario_summary}"
         self.tracer.agent_done("TestDesignAgent", f"Prepared heuristic design brief for {item.target_file}")
         return f"Write one focused Jest test for: {item.scenario_summary}"
+
+    def _reference_test_context(self, target_file: str) -> str | None:
+        target_path = self.config.repo_root / target_file
+        parent = target_path.parent
+        if not parent.exists():
+            return None
+
+        target_name = target_path.stem.lower()
+        sibling_paths = [path for path in parent.glob("*.js") if path.name != target_path.name]
+        if not sibling_paths:
+            return None
+
+        def score(path: Path) -> tuple[int, str]:
+            lowered = path.stem.lower()
+            shared_tokens = sum(1 for token in re.split(r"[^a-z0-9]+", target_name) if token and token in lowered)
+            return (-shared_tokens, path.name)
+
+        ranked = sorted(sibling_paths, key=score)[:2]
+        snippets: list[str] = []
+        for sibling_path in ranked:
+            relative = sibling_path.relative_to(self.config.repo_root).as_posix()
+            snippets.append(f"Reference file: {relative}\n{self.source_reader.read(relative)}")
+
+        return "\n\n---\n\n".join(snippets) if snippets else None
+
+    def _route_generation_hint(self, item: GapPlanItem, existing_test_snippet: str | None) -> str | None:
+        if item.source_kind != "route" or existing_test_snippet:
+            return None
+
+        mount_path = self._mounted_route_base(item.source_file)
+        route_context = self._route_context(item.source_file, 1)
+        route_label = f"{route_context['method']} {route_context['path']}" if route_context else item.behavior_summary
+        lines = [
+            "Repository-grounded setup hint for a NEW route integration test file:",
+            f"- Mount the route module from `{item.source_file}` on a real Express app at `{mount_path}`.",
+            "- Import and use `express`, `supertest`, and the route module directly in the new file.",
+            "- Define `let app;` and initialize it in `beforeAll` with `app = express(); app.use(express.json()); app.use('<mount path>', routeModule);`.",
+            "- Do not rely on `global.__APP__`, `global.__TEST_USER_TOKEN__`, or any other implicit globals unless they already exist in the repository.",
+            "- For auth-gated routes, set `process.env.JWT_SECRET` in the test file, connect to a temporary MongoDB with `MongoMemoryServer`, and create real users with `userModel`, then sign JWTs with `jsonwebtoken`.",
+            "- For role checks, create both a non-admin user (`role: 0`) and, when needed, an admin user (`role: 1`) instead of assuming tokens already exist.",
+            "- This repository's auth middleware expects the raw JWT string in the `Authorization` header, not a `Bearer <token>` prefix.",
+            f"- The immediate scenario under test is `{route_label}`.",
+        ]
+        return "\n".join(lines)
+
+    def _mounted_route_base(self, source_file: str) -> str:
+        server_path = self.config.repo_root / "server.js"
+        route_name = Path(source_file).stem
+        default_base = f"/api/v1/{route_name.removesuffix('Routes').lower()}"
+        if not server_path.exists():
+            return default_base
+
+        try:
+            content = server_path.read_text(encoding="utf-8")
+        except OSError:
+            return default_base
+
+        import_pattern = re.compile(rf"import\s+([A-Za-z_][A-Za-z0-9_]*)\s+from\s+[\"']\.\/{re.escape(source_file)}[\"']")
+        import_match = import_pattern.search(content)
+        if not import_match:
+            return default_base
+
+        import_name = import_match.group(1)
+        use_pattern = re.compile(rf'app\.use\(\s*[\"\']([^\"\']+)[\"\']\s*,\s*{re.escape(import_name)}\s*\)')
+        use_match = use_pattern.search(content)
+        if use_match:
+            return use_match.group(1)
+        return default_base
+
+    def _fresh_route_test_scaffold(self, item: GapPlanItem) -> str | None:
+        if item.source_kind != "route" or item.suite_type != "integration":
+            return None
+
+        route_import = self._relative_import_path(item.target_file, item.source_file)
+        mount_path = self._mounted_route_base(item.source_file)
+        route_import_name = Path(item.source_file).stem
+        behavior_text = " ".join([item.behavior_summary, item.rationale, item.scenario_summary] + item.setup_notes).lower()
+        needs_auth_setup = any(token in behavior_text for token in ("requiresignin", "isadmin", "auth", "token", "admin"))
+
+        imports = [
+            'import express from "express";',
+            'import request from "supertest";',
+            f'import {route_import_name} from "{route_import}";',
+        ]
+        setup_lines = [
+            "let app;",
+        ]
+
+        if needs_auth_setup:
+            user_model_import = self._relative_import_path(item.target_file, "models/userModel.js")
+            imports.extend(
+                [
+                    'import mongoose from "mongoose";',
+                    'import jwt from "jsonwebtoken";',
+                    'import { MongoMemoryServer } from "mongodb-memory-server";',
+                    f'import userModel from "{user_model_import}";',
+                ]
+            )
+            setup_lines = [
+                'process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-integration";',
+                "",
+                "let mongod;",
+                *setup_lines,
+                "",
+                "beforeAll(async () => {",
+                "  mongod = await MongoMemoryServer.create();",
+                "  await mongoose.connect(mongod.getUri());",
+                "  app = express();",
+                "  app.use(express.json());",
+                f'  app.use("{mount_path}", {route_import_name});',
+                "});",
+                "",
+                "afterAll(async () => {",
+                "  await mongoose.connection.dropDatabase();",
+                "  await mongoose.connection.close();",
+                "  await mongod.stop();",
+                "});",
+                "",
+                "afterEach(async () => {",
+                "  jest.restoreAllMocks();",
+                "  await userModel.deleteMany({});",
+                "});",
+            ]
+        else:
+            setup_lines.extend(
+                [
+                    "",
+                    "beforeAll(() => {",
+                    "  app = express();",
+                    "  app.use(express.json());",
+                    f'  app.use("{mount_path}", {route_import_name});',
+                    "});",
+                ]
+            )
+
+        return "\n".join(imports + ["", *setup_lines]).strip()
+
+    def _relative_import_path(self, from_file: str, to_file: str) -> str:
+        from_dir = self.config.repo_root / Path(from_file).parent
+        target = self.config.repo_root / to_file
+        relative = os.path.relpath(target, start=from_dir).replace("\\", "/")
+        return relative if relative.startswith(".") else f"./{relative}"
 
     def _summarize_failure_feedback(self, raw_feedback: str) -> str:
         lines = [line.strip() for line in raw_feedback.splitlines() if line.strip()]
