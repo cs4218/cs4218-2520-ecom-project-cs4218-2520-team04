@@ -55,10 +55,10 @@ class ConfigEnvTests(unittest.TestCase):
             config = RuntimeConfig(command="write")
             self.assertEqual(config.write_retry_limit, 5)
 
-    def test_writer_model_defaults_to_gpt_5_mini(self) -> None:
+    def test_writer_model_defaults_to_gpt_5_4_mini(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = RuntimeConfig(command="write")
-            self.assertEqual(config.writer_model, "gpt-5-mini")
+            self.assertEqual(config.writer_model, "gpt-5.4-mini")
 
 
 if __name__ == "__main__":

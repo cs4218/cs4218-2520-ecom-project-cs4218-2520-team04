@@ -37,6 +37,7 @@ class OpenAILLM:
         plan: GapPlanItem,
         source_snippet: str,
         existing_test_snippet: str | None,
+        reference_test_context: str | None = None,
         design_brief: str | None = None,
         failure_feedback: str | None = None,
         attempt: int = 1,
@@ -57,6 +58,9 @@ class OpenAILLM:
             Existing target test file content:
             {existing_test_snippet or "No existing file content."}
 
+            Reference test examples from this repository:
+            {reference_test_context or "No nearby reference tests provided."}
+
             Design brief:
             {design_brief or "No extra design brief provided."}
 
@@ -72,6 +76,9 @@ class OpenAILLM:
             - If existing target test file content is provided, treat it as the full current file and return ONLY the new block to append.
             - Do not repeat or recreate imports, jest.mock calls, helper declarations, beforeAll/beforeEach hooks, or existing tests that are already present in the target file.
             - Avoid adding new `jest.mock()` factories unless absolutely necessary. If a mock factory is required, do not reference out-of-scope variables from the factory body.
+            - Before returning, verify that every identifier used in the generated code is already available in the existing target file or is declared/imported in the generated block.
+            - If the test uses `request(app)`, make sure `app` is already defined in the existing target file or is explicitly created in the generated code.
+            - For a route integration test with no existing app setup, prefer a minimal local Express app that mounts the route under test.
             - If the plan marks this as a negative case, prioritize rejection, validation, unauthorized, forbidden, malformed input, or failure-path assertions over happy-path assertions.
             - Avoid placeholders like TODO.
             - Prefer deterministic mocks.
@@ -228,6 +235,7 @@ class OpenAILLM:
         plan: GapPlanItem,
         source_snippet: str,
         existing_test_snippet: str | None,
+        reference_test_context: str | None,
         failure_feedback: str | None,
         attempt: int,
     ) -> str:
@@ -247,6 +255,9 @@ class OpenAILLM:
             Existing target test file content:
             {existing_test_snippet or "No existing file content."}
 
+            Reference test examples from this repository:
+            {reference_test_context or "No nearby reference tests provided."}
+
             Verification feedback:
             {failure_feedback or "None. First attempt."}
 
@@ -257,6 +268,7 @@ class OpenAILLM:
             - Identify the exact setup, mocks, trigger, and assertions that should appear in the next test patch.
             - If existing target test file content is provided, design only an incremental block to append rather than a whole-file rewrite.
             - Reuse existing imports, mocks, helpers, and hooks whenever possible.
+            - If existing target test file content does not already define something required by the scenario, explicitly call out the missing import/setup such as `app`, `request`, route mounting, test data factories, or auth token helpers.
             - Mention the negative path explicitly when relevant.
             - Keep the brief under 120 words.
             """

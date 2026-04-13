@@ -511,13 +511,22 @@ class AgentRuntime:
                 else:
                     self._write_session_baselines[item.target_file] = None
             existing_test_snippet = self._write_session_baselines[item.target_file]
+            reference_test_context = self._reference_test_context(item.target_file)
 
-            design_brief = self._design_write_fix(item, source_snippet, existing_test_snippet, feedback_by_gap.get(item.gap_id), attempt)
+            design_brief = self._design_write_fix(
+                item,
+                source_snippet,
+                existing_test_snippet,
+                reference_test_context,
+                feedback_by_gap.get(item.gap_id),
+                attempt,
+            )
             self.tracer.agent_start("TestWriterAgent", f"Generating test patch for {item.target_file} (attempt {attempt})")
             test_code = self._generate_test_code(
                 item,
                 source_snippet,
                 existing_test_snippet,
+                reference_test_context=reference_test_context,
                 design_brief=design_brief,
                 failure_feedback=feedback_by_gap.get(item.gap_id),
                 attempt=attempt,
@@ -602,6 +611,7 @@ class AgentRuntime:
         item: GapPlanItem,
         source_snippet: str,
         existing_test_snippet: str | None,
+        reference_test_context: str | None = None,
         design_brief: str | None = None,
         failure_feedback: str | None = None,
         attempt: int = 1,
@@ -611,6 +621,7 @@ class AgentRuntime:
                 item,
                 source_snippet,
                 existing_test_snippet,
+                reference_test_context=reference_test_context,
                 design_brief=design_brief,
                 failure_feedback=failure_feedback,
                 attempt=attempt,
@@ -633,6 +644,7 @@ class AgentRuntime:
         item: GapPlanItem,
         source_snippet: str,
         existing_test_snippet: str | None,
+        reference_test_context: str | None,
         failure_feedback: str | None,
         attempt: int,
     ) -> str:
@@ -641,11 +653,42 @@ class AgentRuntime:
             self.tracer.agent_done("TestDesignAgent", f"Dry-run only for {item.target_file}")
             return "Dry run enabled; no design brief generated."
         if self.llm.is_available():
-            brief = self.llm.design_write_fix(item, source_snippet, existing_test_snippet, failure_feedback, attempt)
+            brief = self.llm.design_write_fix(
+                item,
+                source_snippet,
+                existing_test_snippet,
+                reference_test_context,
+                failure_feedback,
+                attempt,
+            )
             self.tracer.agent_done("TestDesignAgent", f"Prepared design brief for {item.target_file}")
             return brief or f"Write one focused Jest test for: {item.scenario_summary}"
         self.tracer.agent_done("TestDesignAgent", f"Prepared heuristic design brief for {item.target_file}")
         return f"Write one focused Jest test for: {item.scenario_summary}"
+
+    def _reference_test_context(self, target_file: str) -> str | None:
+        target_path = self.config.repo_root / target_file
+        parent = target_path.parent
+        if not parent.exists():
+            return None
+
+        target_name = target_path.stem.lower()
+        sibling_paths = [path for path in parent.glob("*.js") if path.name != target_path.name]
+        if not sibling_paths:
+            return None
+
+        def score(path: Path) -> tuple[int, str]:
+            lowered = path.stem.lower()
+            shared_tokens = sum(1 for token in re.split(r"[^a-z0-9]+", target_name) if token and token in lowered)
+            return (-shared_tokens, path.name)
+
+        ranked = sorted(sibling_paths, key=score)[:2]
+        snippets: list[str] = []
+        for sibling_path in ranked:
+            relative = sibling_path.relative_to(self.config.repo_root).as_posix()
+            snippets.append(f"Reference file: {relative}\n{self.source_reader.read(relative)}")
+
+        return "\n\n---\n\n".join(snippets) if snippets else None
 
     def _summarize_failure_feedback(self, raw_feedback: str) -> str:
         lines = [line.strip() for line in raw_feedback.splitlines() if line.strip()]
