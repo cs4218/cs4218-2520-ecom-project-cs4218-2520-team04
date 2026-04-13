@@ -10,9 +10,22 @@ class PatchWriterTool:
         self.repo_root = repo_root
         self.tracer = tracer
 
-    def write_test(self, relative_path: str, content: str) -> None:
+    def write_test(self, relative_path: str, content: str, *, base_content: str | None = None, replace: bool = False) -> None:
         target = self.repo_root / relative_path
         target.parent.mkdir(parents=True, exist_ok=True)
+        if replace:
+            normalized_base = (base_content or "").rstrip()
+            normalized_content = content.strip()
+            if normalized_base and normalized_content:
+                updated = normalized_base + "\n\n" + normalized_content + "\n"
+            elif normalized_base:
+                updated = normalized_base + "\n"
+            else:
+                updated = normalized_content + "\n"
+            target.write_text(updated, encoding="utf-8")
+            if self.tracer:
+                self.tracer.tool("PatchWriterTool.write_test", relative_path, "rewritten from baseline")
+            return
         if target.exists():
             existing = target.read_text(encoding="utf-8").rstrip()
             updated = existing + "\n\n" + content.strip() + "\n"

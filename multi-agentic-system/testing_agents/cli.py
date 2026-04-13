@@ -103,6 +103,7 @@ def run_write(runtime: AgentRuntime, config: RuntimeConfig) -> int:
         print(f"{Fore.YELLOW}Write cancelled.{Style.RESET_ALL}")
         return 0
 
+    runtime.reset_write_session()
     graph = build_write_graph(runtime)
     result = graph.invoke(
         {

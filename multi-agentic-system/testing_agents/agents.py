@@ -163,11 +163,15 @@ class AgentRuntime:
         self.jest_runner = JestRunnerTool(config.repo_root, tracer=self.tracer)
         self.llm = OpenAILLM(config, tracer=self.tracer)
         self.supervisor = SupervisorAgent(config, self.llm, self.tracer)
+        self._write_session_baselines: dict[str, str | None] = {}
 
     def health_check(self) -> None:
         self.supervisor.health_check()
         self.config.ensure_directories()
         self.ast_grep.ensure_available()
+
+    def reset_write_session(self) -> None:
+        self._write_session_baselines = {}
 
     def build_repo_map(self) -> RepoMap:
         self.tracer.agent_start("RepoCartographerAgent", "Scanning repository structure and ownership links")
@@ -500,10 +504,13 @@ class AgentRuntime:
                 continue
 
             source_snippet = self.source_reader.read(item.source_file)
-            existing_test_snippet = None
             target_path = self.config.repo_root / item.target_file
-            if target_path.exists():
-                existing_test_snippet = self.source_reader.read_full(item.target_file)
+            if item.target_file not in self._write_session_baselines:
+                if target_path.exists():
+                    self._write_session_baselines[item.target_file] = self.source_reader.read_full(item.target_file)
+                else:
+                    self._write_session_baselines[item.target_file] = None
+            existing_test_snippet = self._write_session_baselines[item.target_file]
 
             design_brief = self._design_write_fix(item, source_snippet, existing_test_snippet, feedback_by_gap.get(item.gap_id), attempt)
             self.tracer.agent_start("TestWriterAgent", f"Generating test patch for {item.target_file} (attempt {attempt})")
@@ -515,7 +522,12 @@ class AgentRuntime:
                 failure_feedback=feedback_by_gap.get(item.gap_id),
                 attempt=attempt,
             )
-            self.patch_writer.write_test(item.target_file, test_code)
+            self.patch_writer.write_test(
+                item.target_file,
+                test_code,
+                base_content=existing_test_snippet,
+                replace=True,
+            )
             results.append(
                 WriteResult(
                     gap_id=item.gap_id,
