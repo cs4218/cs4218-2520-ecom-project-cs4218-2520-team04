@@ -29,6 +29,9 @@ class OpenAILLM:
     def worker_model(self) -> str:
         return self.config.worker_model
 
+    def writer_model(self) -> str:
+        return self.config.writer_model
+
     def generate_test_code(
         self,
         plan: GapPlanItem,
@@ -41,7 +44,7 @@ class OpenAILLM:
         prompt = dedent(
             f"""
             You are generating one Jest test patch for a JavaScript full-stack application.
-            Use model constraints appropriate for {self.worker_model()}.
+            Use model constraints appropriate for {self.writer_model()}.
 
             Return ONLY JavaScript test code, no markdown fences.
 
@@ -51,7 +54,7 @@ class OpenAILLM:
             Source snippet:
             {source_snippet}
 
-            Existing target test snippet:
+            Existing target test file content:
             {existing_test_snippet or "No existing file content."}
 
             Design brief:
@@ -65,7 +68,9 @@ class OpenAILLM:
 
             Rules:
             - Preserve existing test style.
-            - Write only one focused describe/it block for this gap.
+            - Write only one focused incremental describe/it block for this gap.
+            - If existing target test file content is provided, treat it as the full current file and return ONLY the new block to append.
+            - Do not repeat or recreate imports, jest.mock calls, helper declarations, beforeAll/beforeEach hooks, or existing tests that are already present in the target file.
             - If the plan marks this as a negative case, prioritize rejection, validation, unauthorized, forbidden, malformed input, or failure-path assertions over happy-path assertions.
             - Avoid placeholders like TODO.
             - Prefer deterministic mocks.
@@ -74,9 +79,9 @@ class OpenAILLM:
         ).strip()
 
         if self.tracer:
-            self.tracer.llm_call("WORKER", self.worker_model(), f"Generating test code for {plan.target_file}")
+            self.tracer.llm_call("WRITER", self.writer_model(), f"Generating test code for {plan.target_file}")
         response = self._client().responses.create(
-            model=self.worker_model(),
+            model=self.writer_model(),
             input=prompt,
         )
         output = (response.output_text or "").strip()
@@ -238,7 +243,7 @@ class OpenAILLM:
             Source snippet:
             {source_snippet}
 
-            Existing target test snippet:
+            Existing target test file content:
             {existing_test_snippet or "No existing file content."}
 
             Verification feedback:
@@ -249,6 +254,8 @@ class OpenAILLM:
 
             Rules:
             - Identify the exact setup, mocks, trigger, and assertions that should appear in the next test patch.
+            - If existing target test file content is provided, design only an incremental block to append rather than a whole-file rewrite.
+            - Reuse existing imports, mocks, helpers, and hooks whenever possible.
             - Mention the negative path explicitly when relevant.
             - Keep the brief under 120 words.
             """

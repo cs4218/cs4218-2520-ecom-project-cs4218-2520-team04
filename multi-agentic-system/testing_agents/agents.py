@@ -27,7 +27,11 @@ class SupervisorAgent:
         self.tracer = tracer
 
     def health_check(self) -> None:
-        self.tracer.supervisor(f"Supervisor model: {self.config.supervisor_model} | Worker model: {self.config.worker_model}")
+        self.tracer.supervisor(
+            f"Supervisor model: {self.config.supervisor_model} | "
+            f"Worker model: {self.config.worker_model} | "
+            f"Writer model: {self.config.writer_model}"
+        )
 
     def orchestrate_analyze(self, state: dict) -> dict[str, object]:
         has_repo_map = "repo_map" in state
@@ -499,7 +503,7 @@ class AgentRuntime:
             existing_test_snippet = None
             target_path = self.config.repo_root / item.target_file
             if target_path.exists():
-                existing_test_snippet = self.source_reader.read(item.target_file)
+                existing_test_snippet = self.source_reader.read_full(item.target_file)
 
             design_brief = self._design_write_fix(item, source_snippet, existing_test_snippet, feedback_by_gap.get(item.gap_id), attempt)
             self.tracer.agent_start("TestWriterAgent", f"Generating test patch for {item.target_file} (attempt {attempt})")

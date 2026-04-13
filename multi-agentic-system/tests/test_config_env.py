@@ -19,9 +19,13 @@ class ConfigEnvTests(unittest.TestCase):
         self.original = {
             "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY"),
             "OPENAI_SUPERVISOR_MODEL": os.environ.get("OPENAI_SUPERVISOR_MODEL"),
+            "OPENAI_WRITER_MODEL": os.environ.get("OPENAI_WRITER_MODEL"),
+            "WRITE_RETRY_LIMIT": os.environ.get("WRITE_RETRY_LIMIT"),
         }
         os.environ.pop("OPENAI_API_KEY", None)
         os.environ.pop("OPENAI_SUPERVISOR_MODEL", None)
+        os.environ.pop("OPENAI_WRITER_MODEL", None)
+        os.environ.pop("WRITE_RETRY_LIMIT", None)
 
     def tearDown(self) -> None:
         if FIXTURE_ROOT.exists():
@@ -34,7 +38,7 @@ class ConfigEnvTests(unittest.TestCase):
 
     def test_load_project_env_applies_before_runtime_config(self) -> None:
         (FIXTURE_ROOT / ".env").write_text(
-            "OPENAI_API_KEY=test-key\nOPENAI_SUPERVISOR_MODEL=gpt-5.4-mini\n",
+            "OPENAI_API_KEY=test-key\nOPENAI_SUPERVISOR_MODEL=gpt-5.4-mini\nOPENAI_WRITER_MODEL=gpt-5-mini\n",
             encoding="utf-8",
         )
 
@@ -43,6 +47,15 @@ class ConfigEnvTests(unittest.TestCase):
 
         self.assertEqual(config.openai_api_key, "test-key")
         self.assertEqual(config.supervisor_model, "gpt-5.4-mini")
+        self.assertEqual(config.writer_model, "gpt-5-mini")
+
+    def test_write_retry_limit_defaults_to_five(self) -> None:
+        config = RuntimeConfig(command="write")
+        self.assertEqual(config.write_retry_limit, 5)
+
+    def test_writer_model_defaults_to_gpt_5_mini(self) -> None:
+        config = RuntimeConfig(command="write")
+        self.assertEqual(config.writer_model, "gpt-5-mini")
 
 
 if __name__ == "__main__":

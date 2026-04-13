@@ -119,15 +119,41 @@ def run_write(runtime: AgentRuntime, config: RuntimeConfig) -> int:
     write_results = result["write_results"]
     print(f"{Fore.GREEN}{Style.BRIGHT}Write complete:{Style.RESET_ALL} {len(write_results)} fixes processed.")
     for item in write_results:
-        status_color = Fore.GREEN if item.status in {"written", "dry-run"} else Fore.RED
-        verification = item.verification_status or "not-run"
-        verification_color = Fore.GREEN if verification == "passed" else Fore.YELLOW if verification == "not-run" else Fore.RED
-        print(
-            f"- {Fore.BLUE}{item.target_file}{Style.RESET_ALL}: "
-            f"{status_color}{item.status}{Style.RESET_ALL} "
-            f"({verification_color}{verification}{Style.RESET_ALL})"
-        )
+        print(_format_write_result(item, config))
     return 0
+
+
+def _format_write_result(item, config: RuntimeConfig) -> str:
+    verification = item.verification_status or "not-run"
+    verification_color = Fore.GREEN if verification == "passed" else Fore.YELLOW if verification == "not-run" else Fore.RED
+    status_color = Fore.GREEN if item.status in {"written", "dry-run"} else Fore.RED
+    retry_budget = max(1, config.write_retry_limit)
+    attempt_summary = f"attempt {item.attempts}/{retry_budget}"
+
+    if item.status == "dry-run":
+        headline = f"{status_color}dry-run{Style.RESET_ALL} ({verification_color}{verification}{Style.RESET_ALL})"
+    elif verification == "passed":
+        headline = f"{status_color}write succeeded{Style.RESET_ALL} ({verification_color}verification passed{Style.RESET_ALL}, {attempt_summary})"
+    elif verification == "failed":
+        if item.attempts >= retry_budget and not config.dry_run:
+            headline = (
+                f"{Fore.RED}write succeeded but verification failed after max retries{Style.RESET_ALL} "
+                f"({verification_color}{attempt_summary}{Style.RESET_ALL})"
+            )
+        else:
+            headline = (
+                f"{Fore.RED}write succeeded but verification failed{Style.RESET_ALL} "
+                f"({verification_color}{attempt_summary}{Style.RESET_ALL})"
+            )
+    else:
+        headline = f"{status_color}{item.status}{Style.RESET_ALL} ({verification_color}{verification}{Style.RESET_ALL}, {attempt_summary})"
+
+    lines = [f"- {Fore.BLUE}{item.target_file}{Style.RESET_ALL}: {headline}"]
+    if item.notes:
+        detail = " ".join(part.strip() for part in item.notes if part.strip())
+        if detail:
+            lines.append(f"  {Fore.YELLOW}note:{Style.RESET_ALL} {detail}")
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:

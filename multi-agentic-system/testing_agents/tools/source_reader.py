@@ -20,3 +20,9 @@ class SourceReadTool:
         if self.tracer:
             self.tracer.tool("SourceReadTool.read", relative_path, f"truncated from {len(content)} chars")
         return content[: self.max_chars] + "\n... [truncated]"
+
+    def read_full(self, relative_path: str) -> str:
+        content = (self.repo_root / relative_path).read_text(encoding="utf-8")
+        if self.tracer:
+            self.tracer.tool("SourceReadTool.read_full", relative_path, f"{len(content)} chars")
+        return content
