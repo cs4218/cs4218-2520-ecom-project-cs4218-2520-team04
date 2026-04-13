@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi-agentic-testing-system"
+version = "0.1.0"
+description = "LangGraph-powered CLI for repo scanning, test-gap planning, and interactive Jest test generation."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "ast-grep-cli>=0.39.6",
+  "langgraph>=0.2.56",
+  "openai>=1.99.0",
+]
+
+[project.scripts]
+testing_agents = "testing_agents.cli:main"
+
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+include = ["testing_agents*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
