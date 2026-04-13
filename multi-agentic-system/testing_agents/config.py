@@ -33,6 +33,7 @@ class RuntimeConfig:
     artifact_dir: Path = PROJECT_ROOT / "artifacts"
     supervisor_model: str = field(default_factory=lambda: os.environ.get("OPENAI_SUPERVISOR_MODEL", "gpt-5.4-mini"))
     worker_model: str = field(default_factory=lambda: os.environ.get("OPENAI_WORKER_MODEL", "gpt-5.4-nano"))
+    writer_model: str = field(default_factory=lambda: os.environ.get("OPENAI_WRITER_MODEL", "gpt-5-mini"))
     openai_api_key: str | None = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY"))
     ast_grep_bin: str = field(default_factory=lambda: os.environ.get("AST_GREP_BIN", "ast-grep"))
     limit: int = 25

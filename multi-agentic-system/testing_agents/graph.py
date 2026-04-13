@@ -18,6 +18,10 @@ def build_analyze_graph(runtime: AgentRuntime):
     START, END, StateGraph = _langgraph_import()
     graph = StateGraph(GraphState)
 
+    def supervisor_agent(state: GraphState) -> GraphState:
+        runtime.tracer.supervisor("SupervisorAgent is orchestrating the analyze stage")
+        return runtime.supervisor.orchestrate_analyze(state)
+
     def repo_cartographer(state: GraphState) -> GraphState:
         runtime.tracer.supervisor("Calling subagent RepoCartographerAgent")
         repo_map = runtime.build_repo_map()
@@ -36,13 +40,30 @@ def build_analyze_graph(runtime: AgentRuntime):
         runtime.artifacts.write_json("gap_plan.json", [item.to_dict() for item in gap_plan])
         return {"gap_plan": gap_plan}
 
+    def route_from_supervisor(state: GraphState) -> str:
+        next_step = state.get("next_action", "complete")
+        if next_step == "complete":
+            return "end"
+        return next_step
+
+    graph.add_node("supervisor", supervisor_agent)
     graph.add_node("repo_cartographer", repo_cartographer)
     graph.add_node("test_inventory", inventory_agent)
     graph.add_node("analyze", analyze_agent)
-    graph.add_edge(START, "repo_cartographer")
-    graph.add_edge("repo_cartographer", "test_inventory")
-    graph.add_edge("test_inventory", "analyze")
-    graph.add_edge("analyze", END)
+    graph.add_edge(START, "supervisor")
+    graph.add_conditional_edges(
+        "supervisor",
+        route_from_supervisor,
+        {
+            "repo_cartographer": "repo_cartographer",
+            "test_inventory": "test_inventory",
+            "analyze": "analyze",
+            "end": END,
+        },
+    )
+    graph.add_edge("repo_cartographer", "supervisor")
+    graph.add_edge("test_inventory", "supervisor")
+    graph.add_edge("analyze", "supervisor")
     return graph.compile()
 
 

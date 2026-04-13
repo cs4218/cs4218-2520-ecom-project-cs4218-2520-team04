@@ -11,6 +11,8 @@ class GraphState(TypedDict, total=False):
     repo_map: RepoMap
     test_inventory: TestInventory
     gap_plan: list[GapPlanItem]
+    analyze_stage: str
+    next_action: str
     selected_gap_ids: list[str]
     active_items: list[GapPlanItem]
     write_results: list[WriteResult]
